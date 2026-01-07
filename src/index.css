@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: oklch(0.982 0.018 155.826);
+  --color-input: rgb(243, 243, 245);
+  --color-ring: oklch(0.6 0.118 184.704);
+  /* Using teal from gradient as ring color */
+
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+}
+
+:root {
+  /* Global Resets or additional vars */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(to right bottom, oklch(0.982 0.018 155.826) 0%, oklch(0.984 0.014 180.72) 50%, oklch(0.962 0.044 156.743) 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
