@@ -7,11 +7,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 
-return (
-    <div style={{ padding: 40, background: 'red', color: 'white', fontSize: 32 }}>
-        THIS IS LOGIN.JSX — IF YOU SEE THIS, FILE IS ACTIVE
-    </div>
-);
+
 
 export default function LoginPage() {
     const navigate = useNavigate();
