@@ -1,12 +1,38 @@
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = 3005;
 
 app.use(cors());
 app.use(express.json());
+
+// File Upload Configuration
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database Connection Pool
 const pool = mysql.createPool({
@@ -75,15 +101,40 @@ app.get('/api/listings', async (req, res) => {
     }
 });
 
-app.post('/api/listings', async (req, res) => {
-    const { project_source, volume, price, type, vintage, certificate_file, cover_image } = req.body;
+app.post('/api/listings', upload.fields([
+    { name: 'certificate_file', maxCount: 1 },
+    { name: 'cover_image', maxCount: 1 }
+]), async (req, res) => {
+    const { project_source, volume, price, type, vintage } = req.body;
+
+    const certificate_file = req.files['certificate_file'] ? req.files['certificate_file'][0].filename : null;
+    const cover_image = req.files['cover_image'] ? req.files['cover_image'][0].filename : null;
+
     try {
         const [result] = await pool.query(
             'INSERT INTO listings (project_source, volume, price, type, vintage, status, fill_percentage, certificate_file, cover_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [project_source, volume, price, type, vintage, 'In Review', 0, certificate_file, cover_image]
         );
-        res.status(201).json({ id: result.insertId, ...req.body, status: 'In Review' });
+
+        // Create notification for verification
+        await pool.query(
+            'INSERT INTO notifications (title, message) VALUES (?, ?)',
+            ['New Verification Required', `Asset from ${project_source} requires protocol authorization.`]
+        );
+
+        res.status(201).json({
+            id: result.insertId,
+            project_source,
+            volume,
+            price,
+            type,
+            vintage,
+            status: 'In Review',
+            certificate_file,
+            cover_image
+        });
     } catch (err) {
+        console.error("Listing creation error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -185,15 +236,24 @@ app.put('/api/projects/:id/status', async (req, res) => {
 });
 
 // Update listing
-app.put('/api/listings/:id', async (req, res) => {
-    const { project_source, volume, price, type, vintage, cover_image } = req.body;
+app.put('/api/listings/:id', upload.fields([
+    { name: 'cover_image', maxCount: 1 }
+]), async (req, res) => {
+    const { project_source, volume, price, type, vintage } = req.body;
+    let cover_image = req.body.cover_image;
+
+    if (req.files && req.files['cover_image']) {
+        cover_image = req.files['cover_image'][0].filename;
+    }
+
     try {
         await pool.query(
             'UPDATE listings SET project_source = ?, volume = ?, price = ?, type = ?, vintage = ?, cover_image = ? WHERE id = ?',
             [project_source, volume, price, type, vintage, cover_image, req.params.id]
         );
-        res.json({ message: 'Listing updated successfully' });
+        res.json({ message: 'Listing updated successfully', cover_image });
     } catch (err) {
+        console.error("Listing update error:", err);
         res.status(500).json({ error: err.message });
     }
 });

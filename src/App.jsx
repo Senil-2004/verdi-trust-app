@@ -26,12 +26,13 @@ function App() {
 
         <Route element={<DashboardLayout />}>
           <Route path="/developer" element={<DeveloperDashboard />} />
+          <Route path="/project-developer" element={<DeveloperDashboard />} />
+          <Route path="/verifier" element={<DeveloperDashboard />} />
           <Route path="/buyer" element={<BuyerDashboard />} />
           <Route path="/seller-onboarding" element={<SellerOnboarding />} />
           <Route path="/seller" element={<SellerDashboard />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
-
-        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </Router>
   );

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Leaf, User, Mail, Lock, CheckCircle, Shield, AlertCircle } from 'lucide-react';
+import { Leaf, User, Mail, Lock, CheckCircle, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { auth, db } from '../firebase';
 import {
     GoogleAuthProvider,
@@ -18,73 +17,124 @@ import { Link } from 'react-router-dom';
 export function LoginPage() {
     const navigate = useNavigate();
     const [isSignUp, setIsSignUp] = useState(false);
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
+
+    // Form State
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+    });
+
+    // Validation State
     const [errors, setErrors] = useState({});
+    const [touched, setTouched] = useState({});
     const [loading, setLoading] = useState(false);
 
-    const validate = () => {
-        const newErrors = {};
-
-        if (isSignUp && !name) {
-            newErrors.name = 'Full name is required';
+    // Validation Rules
+    const validateField = (name, value) => {
+        let error = '';
+        switch (name) {
+            case 'email':
+                if (!value) error = 'Email is required';
+                else if (!/\S+@\S+\.\S+/.test(value)) error = 'Invalid email format';
+                break;
+            case 'password':
+                if (!value) error = 'Password is required';
+                else if (value.length < 6) error = 'Must be at least 6 characters';
+                break;
+            case 'confirmPassword':
+                if (isSignUp && value !== formData.password) error = 'Passwords do not match';
+                break;
+            case 'name':
+                if (isSignUp && !value) error = 'Full name is required';
+                break;
+            default:
+                break;
         }
-
-        if (!email) {
-            newErrors.email = 'Email is required';
-        } else if (!/\S+@\S+\.\S+/.test(email)) {
-            newErrors.email = 'Please enter a valid email address';
-        }
-
-        if (!password) {
-            newErrors.password = 'Password is required';
-        } else if (password.length < 6) {
-            newErrors.password = 'Password must be at least 6 characters';
-        }
-
-        if (isSignUp && password !== confirmPassword) {
-            newErrors.confirmPassword = 'Passwords do not match';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        return error;
     };
 
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Live Validation
+        const error = validateField(name, value);
+        setErrors(prev => ({ ...prev, [name]: error }));
+
+        // Special case for confirm password to re-validate if password changes
+        if (name === 'password' && isSignUp) {
+            if (formData.confirmPassword) {
+                const confirmError = value !== formData.confirmPassword ? 'Passwords do not match' : '';
+                setErrors(prev => ({ ...prev, confirmPassword: confirmError }));
+            }
+        }
+    };
+
+    const handleBlur = (e) => {
+        const { name } = e.target;
+        setTouched(prev => ({ ...prev, [name]: true }));
+        const error = validateField(name, formData[name]);
+        setErrors(prev => ({ ...prev, [name]: error }));
+    };
+
+    const isValid = (name) => {
+        return touched[name] && !errors[name] && formData[name];
+    };
+
+    const isInvalid = (name) => {
+        return touched[name] && errors[name];
+    };
 
     const handleAuth = async (e) => {
         e.preventDefault();
-        if (!validate()) return;
+
+        // Validate all fields
+        const newErrors = {};
+        Object.keys(formData).forEach(key => {
+            if (!isSignUp && (key === 'name' || key === 'confirmPassword')) return;
+            const error = validateField(key, formData[key]);
+            if (error) newErrors[key] = error;
+        });
+
+        setErrors(newErrors);
+        setTouched({
+            name: true,
+            email: true,
+            password: true,
+            confirmPassword: true
+        });
+
+        if (Object.keys(newErrors).length > 0) return;
+
         setLoading(true);
 
         try {
             if (isSignUp) {
                 // Create New Account
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
                 const user = userCredential.user;
 
                 // Save to Firestore
                 await setDoc(doc(db, "users", user.uid), {
-                    name,
-                    email,
+                    name: formData.name,
+                    email: formData.email,
                     role: localStorage.getItem('isSeller') === 'true' ? 'seller' : 'buyer',
                     createdAt: new Date().toISOString()
                 });
 
-                localStorage.setItem('userName', name);
+                localStorage.setItem('userName', formData.name);
                 console.log("Firebase Account & DB Entry Created");
             } else {
                 // Login Existing User
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                // In a real app, you'd fetch the name from Firestore here. 
-                // For now, we'll try to find it or use a default.
-                localStorage.setItem('userName', email.split('@')[0]);
+                const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+                localStorage.setItem('userName', formData.email.split('@')[0]);
                 console.log("Firebase Login Success");
             }
 
             // Navigation Logic
-            if (email === 'admin@verditrust.com') {
+            if (formData.email === 'admin@verditrust.com') {
                 navigate('/admin');
             } else {
                 const isSeller = localStorage.getItem('isSeller') === 'true';
@@ -92,13 +142,11 @@ export function LoginPage() {
             }
         } catch (error) {
             console.error("Firebase Auth Failed:", error);
-            setErrors({ auth: error.message });
+            setErrors(prev => ({ ...prev, auth: error.message }));
         } finally {
             setLoading(false);
         }
     };
-
-
 
     const handleGoogleSignIn = async () => {
         const provider = new GoogleAuthProvider();
@@ -117,6 +165,13 @@ export function LoginPage() {
             console.error("Firebase Google Login Failed:", error);
             alert(`Google Sign-In failed: ${error.message}`);
         }
+    };
+
+    // Helper to get input styles
+    const getInputStyles = (name) => {
+        if (isInvalid(name)) return 'border-rose-500/50 bg-rose-500/5 focus:border-rose-500 focus:ring-rose-500/20';
+        if (isValid(name)) return 'border-emerald-500/50 bg-emerald-500/5 focus:border-emerald-500 focus:ring-emerald-500/20';
+        return 'bg-slate-900/50 border-slate-800 focus:border-emerald-500/50 focus:ring-emerald-500/20';
     };
 
     return (
@@ -186,7 +241,7 @@ export function LoginPage() {
 
                     <form onSubmit={handleAuth} className="space-y-5">
                         {errors.auth && (
-                            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-xs font-bold text-center flex items-center gap-2 justify-center">
+                            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-xs font-bold text-center flex items-center gap-2 justify-center animate-in shake">
                                 <AlertCircle className="w-4 h-4" />
                                 {errors.auth}
                             </div>
@@ -194,47 +249,49 @@ export function LoginPage() {
 
                         {isSignUp && (
                             <div className="space-y-2 group">
-                                <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${errors.name ? 'text-rose-400' : 'text-slate-500 group-focus-within:text-emerald-500'}`}>
+                                <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${isInvalid('name') ? 'text-rose-400' : isValid('name') ? 'text-emerald-400' : 'text-slate-500'}`}>
                                     Full Name
                                 </Label>
                                 <div className="relative">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                                    <User className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isInvalid('name') ? 'text-rose-400' : isValid('name') ? 'text-emerald-400' : 'text-slate-600'}`} />
                                     <Input
-                                        value={name}
-                                        onChange={(e) => {
-                                            setName(e.target.value);
-                                            if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
-                                        }}
-                                        className={`h-14 px-12 rounded-2xl bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 transition-all ${errors.name ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleChange}
+                                        onBlur={handleBlur}
+                                        className={`h-14 px-12 rounded-2xl text-white placeholder:text-slate-700 focus:ring-2 transition-all ${getInputStyles('name')}`}
                                         placeholder="Enter your name"
                                     />
+                                    {isValid('name') && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 animate-in fade-in zoom-in" />}
+                                    {isInvalid('name') && <XCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500 animate-in fade-in zoom-in" />}
                                 </div>
-                                {errors.name && <p className="text-[10px] text-rose-400 font-bold ml-1">{errors.name}</p>}
+                                {isInvalid('name') && <p className="text-[10px] text-rose-400 font-bold ml-1 animate-in slide-in-from-left-2">{errors.name}</p>}
                             </div>
                         )}
 
                         <div className="space-y-2 group">
-                            <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${errors.email ? 'text-rose-400' : 'text-slate-500 group-focus-within:text-emerald-500'}`}>
+                            <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${isInvalid('email') ? 'text-rose-400' : isValid('email') ? 'text-emerald-400' : 'text-slate-500'}`}>
                                 Corporate Email
                             </Label>
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                                <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isInvalid('email') ? 'text-rose-400' : isValid('email') ? 'text-emerald-400' : 'text-slate-600'}`} />
                                 <Input
-                                    value={email}
-                                    onChange={(e) => {
-                                        setEmail(e.target.value);
-                                        if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
-                                    }}
-                                    className={`h-14 px-12 rounded-2xl bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 transition-all ${errors.email ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    className={`h-14 px-12 rounded-2xl text-white placeholder:text-slate-700 focus:ring-2 transition-all ${getInputStyles('email')}`}
                                     placeholder="name@corporation.com"
                                 />
+                                {isValid('email') && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 animate-in fade-in zoom-in" />}
+                                {isInvalid('email') && <XCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500 animate-in fade-in zoom-in" />}
                             </div>
-                            {errors.email && <p className="text-[10px] text-rose-400 font-bold ml-1">{errors.email}</p>}
+                            {isInvalid('email') && <p className="text-[10px] text-rose-400 font-bold ml-1 animate-in slide-in-from-left-2">{errors.email}</p>}
                         </div>
 
                         <div className="space-y-2 group">
                             <div className="flex justify-between items-center mb-1">
-                                <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${errors.password ? 'text-rose-400' : 'text-slate-500 group-focus-within:text-emerald-500'}`}>
+                                <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${isInvalid('password') ? 'text-rose-400' : isValid('password') ? 'text-emerald-400' : 'text-slate-500'}`}>
                                     Password
                                 </Label>
                                 {!isSignUp && (
@@ -244,40 +301,42 @@ export function LoginPage() {
                                 )}
                             </div>
                             <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                                <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isInvalid('password') ? 'text-rose-400' : isValid('password') ? 'text-emerald-400' : 'text-slate-600'}`} />
                                 <Input
+                                    name="password"
                                     type="password"
-                                    value={password}
-                                    onChange={(e) => {
-                                        setPassword(e.target.value);
-                                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
-                                    }}
-                                    className={`h-14 px-12 rounded-2xl bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 transition-all ${errors.password ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    className={`h-14 px-12 rounded-2xl text-white placeholder:text-slate-700 focus:ring-2 transition-all ${getInputStyles('password')}`}
                                     placeholder="••••••••"
                                 />
+                                {isValid('password') && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 animate-in fade-in zoom-in" />}
+                                {isInvalid('password') && <XCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500 animate-in fade-in zoom-in" />}
                             </div>
-                            {errors.password && <p className="text-[10px] text-rose-400 font-bold ml-1">{errors.password}</p>}
+                            {isInvalid('password') && <p className="text-[10px] text-rose-400 font-bold ml-1 animate-in slide-in-from-left-2">{errors.password}</p>}
                         </div>
 
                         {isSignUp && (
                             <div className="space-y-2 group">
-                                <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${errors.confirmPassword ? 'text-rose-400' : 'text-slate-500 group-focus-within:text-emerald-500'}`}>
+                                <Label className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${isInvalid('confirmPassword') ? 'text-rose-400' : isValid('confirmPassword') ? 'text-emerald-400' : 'text-slate-500'}`}>
                                     Verify Password
                                 </Label>
                                 <div className="relative">
-                                    <CheckCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                                    <CheckCircle className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isInvalid('confirmPassword') ? 'text-rose-400' : isValid('confirmPassword') ? 'text-emerald-400' : 'text-slate-600'}`} />
                                     <Input
+                                        name="confirmPassword"
                                         type="password"
-                                        value={confirmPassword}
-                                        onChange={(e) => {
-                                            setConfirmPassword(e.target.value);
-                                            if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: '' }));
-                                        }}
-                                        className={`h-14 px-12 rounded-2xl bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 transition-all ${errors.confirmPassword ? 'border-rose-500/50 bg-rose-500/5' : ''}`}
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        onBlur={handleBlur}
+                                        className={`h-14 px-12 rounded-2xl text-white placeholder:text-slate-700 focus:ring-2 transition-all ${getInputStyles('confirmPassword')}`}
                                         placeholder="••••••••"
                                     />
+                                    {isValid('confirmPassword') && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 animate-in fade-in zoom-in" />}
+                                    {isInvalid('confirmPassword') && <XCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500 animate-in fade-in zoom-in" />}
                                 </div>
-                                {errors.confirmPassword && <p className="text-[10px] text-rose-400 font-bold ml-1">{errors.confirmPassword}</p>}
+                                {isInvalid('confirmPassword') && <p className="text-[10px] text-rose-400 font-bold ml-1 animate-in slide-in-from-left-2">{errors.confirmPassword}</p>}
                             </div>
                         )}
 
@@ -326,6 +385,8 @@ export function LoginPage() {
                                 onClick={() => {
                                     setIsSignUp(!isSignUp);
                                     setErrors({});
+                                    setTouched({});
+                                    setFormData({ name: '', email: '', password: '', confirmPassword: '' });
                                 }}
                                 className="text-sm font-black text-emerald-500 hover:text-emerald-400 transition-colors uppercase tracking-[0.2em] border-b-2 border-emerald-500/20 pb-1"
                             >

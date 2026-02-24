@@ -41,7 +41,13 @@ CREATE TABLE IF NOT EXISTS projects (
     submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Initial Data (Optional, to populate empty tables)
+-- Delete existing data to avoid duplicates
+DELETE FROM listings;
+DELETE FROM transactions;
+DELETE FROM users;
+DELETE FROM projects;
+
+-- Initial Data
 INSERT INTO listings (project_source, volume, price, status, fill_percentage, type, vintage) VALUES
 ('Amazon Reforestation', 4200, 22.50, 'Active', 84, 'Nature', 2023),
 ('Wind Farm Indonesia', 12000, 18.00, 'Active', 22, 'Energy', 2022),

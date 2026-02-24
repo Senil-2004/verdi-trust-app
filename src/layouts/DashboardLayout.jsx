@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Leaf, LogOut, Bell, User } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { auth } from '../firebase';
@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth';
 
 const DashboardLayout = () => {
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleLogout = async () => {
         try {
@@ -69,12 +70,20 @@ const DashboardLayout = () => {
         }
     };
 
-    const isSeller = localStorage.getItem('isSeller') === 'true';
+    const getRoleLabel = () => {
+        const path = location.pathname;
+        if (path.includes('/admin')) return 'Platform Administrator';
+        if (path.includes('/buyer')) return 'Sovereign Buyer';
+        if (path.includes('/seller')) return 'Asset Provider';
+        if (path.includes('/verifier')) return 'Verifier';
+        if (path.includes('/developer') || path.includes('/project-developer')) return 'Project Developer';
+        return 'Standard User';
+    };
 
     return (
         <div className="min-h-screen bg-[#080c0a] text-slate-200 flex flex-col font-['Outfit']">
             {/* Top Navigation */}
-            <header className="h-20 glass-morphism sticky top-0 z-50 flex items-center justify-between px-10 border-b border-white/5">
+            <header className="h-16 glass-morphism sticky top-0 z-50 flex items-center justify-between px-6 border-b border-white/5">
                 <Link to="/" className="flex items-center gap-3 group">
                     <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 rounded-2xl shadow-lg shadow-emerald-500/10 group-hover:scale-110 transition-transform">
                         <Leaf className="w-6 h-6 text-[#080c0a]" />
@@ -146,7 +155,7 @@ const DashboardLayout = () => {
                                 <div className="flex items-center justify-end gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                     <p className="text-[9px] text-slate-500 uppercase tracking-widest font-black">
-                                        {localStorage.getItem('isSeller') === 'true' ? 'Verifier' : 'Sovereign Buyer'}
+                                        {getRoleLabel()}
                                     </p>
                                 </div>
                             </div>

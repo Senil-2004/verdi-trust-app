@@ -27,7 +27,10 @@ import {
     FileUp,
     Edit2,
     Trash2,
-    Image as ImageIcon
+    Image as ImageIcon,
+    RefreshCw,
+    Download,
+    FileText
 } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
@@ -69,7 +72,7 @@ const SellerDashboard = () => {
     const [coverImage, setCoverImage] = useState(null);
     const [coverImagePreview, setCoverImagePreview] = useState(null);
     const [newListing, setNewListing] = useState({
-        project_source: 'Amazon Reforestation',
+        project_source: '',
         volume: '',
         price: '',
         type: 'Nature',
@@ -80,6 +83,43 @@ const SellerDashboard = () => {
 
     const [listings, setListings] = useState([]);
     const [recentTransactions, setRecentTransactions] = useState([]);
+
+    const handleDownloadCSV = (data, fileName) => {
+        const headers = ["ID", "Project Source", "Type", "Price", "Volume", "Vintage", "Status", "Certificate URL"];
+        const csvContent = "data:text/csv;charset=utf-8,"
+            + headers.join(",") + "\n"
+            + data.map(l => {
+                const price = String(l.price || '').replace(/[₹,]/g, '');
+                const certUrl = l.certificate_file ? `http://localhost:3005/uploads/${l.certificate_file}` : 'N/A';
+                return `${l.id},"${l.project_source}","${l.type}",${price},${l.volume},${l.vintage},"${l.status}","${certUrl}"`;
+            }).join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${fileName}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleDownloadSingle = (l) => {
+        const content = `Asset Identifier: CRT-${l.id}
+Source: ${l.project_source}
+Type: ${l.type}
+Price: ₹${l.price}/Ton
+Volume: ${l.volume} Tons
+Vintage: ${l.vintage}
+Status: ${l.status}
+Certificate: ${l.certificate_file || 'N/A'}`;
+
+        const element = document.createElement("a");
+        const file = new Blob([content], { type: 'text/plain' });
+        element.href = URL.createObjectURL(file);
+        element.download = `CRT-${l.id}-details.txt`;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    };
 
 
 
@@ -93,12 +133,63 @@ const SellerDashboard = () => {
         setTimeout(() => setActionStatus({ type: '', active: false }), 3000);
     };
 
-    const validateListing = () => {
+    const runError = (label) => {
+        setActionStatus({ type: label, active: true, isError: true });
+        setTimeout(() => setActionStatus({ type: '', active: false, isError: false }), 3000);
+    };
+
+    const validateField = (name, value) => {
+        setErrors(prev => {
+            const newErrors = { ...prev };
+
+            if (name === 'project_source') {
+                if (!value) newErrors.project_source = "Project source is required";
+                else delete newErrors.project_source;
+            }
+
+            if (name === 'volume') {
+                const numVal = Number(value);
+                if (!value || isNaN(value) || numVal <= 0) newErrors.volume = "Valid volume is required";
+                else if (numVal > 1000000000) newErrors.volume = "Volume exceeds institutional limit (100 Crore)";
+                else delete newErrors.volume;
+            }
+
+            if (name === 'price') {
+                const cleanPrice = String(value).replace(/[₹,]/g, '').trim();
+                const numVal = Number(cleanPrice);
+                if (!cleanPrice || isNaN(cleanPrice) || numVal <= 0) newErrors.price = "Valid price is required";
+                else if (numVal > 1000000) newErrors.price = "Price exceeds market cap (₹10 Lakh/ton)";
+                else delete newErrors.price;
+            }
+
+            if (name === 'vintage') {
+                if (!value || isNaN(value) || Number(value) < 2000 || Number(value) > 2100) newErrors.vintage = "Valid vintage year is required";
+                else delete newErrors.vintage;
+            }
+
+            return newErrors;
+        });
+    };
+
+    const validateListing = (data, files) => {
         const newErrors = {};
-        if (!newListing.project_source) newErrors.project_source = "Project source is required";
-        if (!newListing.volume || isNaN(newListing.volume) || Number(newListing.volume) <= 0) newErrors.volume = "Valid volume is required";
-        if (!newListing.price || isNaN(newListing.price) || Number(newListing.price) <= 0) newErrors.price = "Valid price is required";
-        if (!newListing.vintage || isNaN(newListing.vintage) || newListing.vintage < 2000 || newListing.vintage > 2100) newErrors.vintage = "Valid vintage year is required";
+        if (!data.project_source) newErrors.project_source = "Project source is required";
+
+        const numVolume = Number(data.volume);
+        if (!data.volume || isNaN(data.volume) || numVolume <= 0) newErrors.volume = "Valid volume is required";
+        else if (numVolume > 1000000000) newErrors.volume = "Volume exceeds institutional limit (100 Crore)";
+
+        const cleanPrice = String(data.price).replace(/[₹,]/g, '').trim();
+        const numPrice = Number(cleanPrice);
+        if (!cleanPrice || isNaN(cleanPrice) || numPrice <= 0) newErrors.price = "Valid price is required";
+        else if (numPrice > 1000000) newErrors.price = "Price exceeds market cap (₹10 Lakh/ton)";
+
+        if (!data.vintage || isNaN(data.vintage) || data.vintage < 2000 || data.vintage > 2100) newErrors.vintage = "Valid vintage year is required";
+
+        if (files) {
+            if (!files.certificate_file) newErrors.certificate_file = "Verification document is required";
+            if (!files.cover_image) newErrors.cover_image = "Cover image is required";
+        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -136,11 +227,19 @@ const SellerDashboard = () => {
         try {
             const listingsRes = await fetch('/api/listings');
             const listingsData = await listingsRes.json();
-            setListings(listingsData);
+            if (Array.isArray(listingsData)) {
+                setListings(listingsData);
+            } else {
+                console.error("Listings API error", listingsData);
+            }
 
             const txRes = await fetch('/api/transactions');
             const txData = await txRes.json();
-            setRecentTransactions(txData);
+            if (Array.isArray(txData)) {
+                setRecentTransactions(txData);
+            } else {
+                console.error("Transactions API error", txData);
+            }
         } catch (error) {
             console.error("Failed to fetch data", error);
         }
@@ -164,15 +263,33 @@ const SellerDashboard = () => {
     };
 
     const handleUpdateListing = async () => {
+        if (!validateListing(editingListing)) return;
         try {
+            const formData = new FormData();
+            formData.append('project_source', editingListing.project_source);
+            formData.append('volume', editingListing.volume);
+
+            // Clean price
+            const cleanPrice = String(editingListing.price).replace(/[₹,]/g, '').trim();
+            formData.append('price', cleanPrice);
+
+            formData.append('type', editingListing.type);
+            formData.append('vintage', editingListing.vintage);
+
+            if (editingListing.cover_image_file) {
+                formData.append('cover_image', editingListing.cover_image_file);
+            } else if (editingListing.cover_image) {
+                formData.append('cover_image', editingListing.cover_image); // Send string if no new file
+            }
+
             const res = await fetch(`/api/listings/${editingListing.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editingListing)
+                body: formData
             });
             if (res.ok) {
                 runAction('Listing updated');
                 setIsEditOpen(false);
+                setCoverImagePreview(null);
                 fetchData();
             }
         } catch (error) {
@@ -197,13 +314,19 @@ const SellerDashboard = () => {
     };
 
     return (
-        <div className="p-12 max-w-7xl mx-auto space-y-16 animate-in fade-in duration-1000">
+        <div className="p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-1000">
             {/* Action Toast */}
             {actionStatus.active && (
                 <div className="fixed bottom-12 right-12 z-50 animate-in slide-in-from-right-10">
-                    <div className="glass-morphism-heavy px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-emerald-500/20">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                        <span className="text-sm font-black text-white uppercase tracking-widest">{actionStatus.type} initiated!</span>
+                    <div className={`glass-morphism-heavy px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border ${actionStatus.isError ? 'border-rose-500/20' : 'border-emerald-500/20'}`}>
+                        {actionStatus.isError ? (
+                            <AlertCircle className="w-5 h-5 text-rose-400" />
+                        ) : (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        )}
+                        <span className="text-sm font-black text-white uppercase tracking-widest">
+                            {actionStatus.isError ? actionStatus.type : `${actionStatus.type} initiated!`}
+                        </span>
                     </div>
                 </div>
             )}
@@ -222,13 +345,13 @@ const SellerDashboard = () => {
                                 Create Offering
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-3xl bg-[#080c0a] border border-white/10 text-white rounded-[2.5rem] p-0 overflow-hidden shadow-2xl">
-                            <div className="bg-gradient-to-br from-emerald-600/20 to-teal-600/20 p-10 border-b border-white/10">
-                                <DialogTitle className="text-4xl font-black tracking-tight mb-2">Create New Offering</DialogTitle>
-                                <p className="text-slate-400 font-medium">Deploy your verified carbon assets to the global marketplace.</p>
+                        <DialogContent className="max-w-3xl bg-[#080c0a] border border-white/10 text-white rounded-[2.5rem] p-0 shadow-2xl overflow-y-auto max-h-[90vh] scrollbar-hide">
+                            <div className="bg-gradient-to-br from-emerald-600/20 to-teal-600/20 p-6 border-b border-white/10">
+                                <DialogTitle className="text-2xl font-black tracking-tight mb-1">Create New Offering</DialogTitle>
+                                <p className="text-slate-400 font-medium text-xs">Deploy your verified carbon assets to the global marketplace.</p>
                             </div>
 
-                            <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-8">
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-2 mb-2">
@@ -238,15 +361,16 @@ const SellerDashboard = () => {
 
                                         <div className="space-y-2">
                                             <Label className="text-xs font-bold text-slate-400">Project Source</Label>
-                                            <select
-                                                className={`w-full h-14 px-5 rounded-2xl border ${errors.project_source ? 'border-rose-500' : 'border-white/10'} bg-white/5 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none`}
+                                            <Input
+                                                placeholder="e.g., Amazon Reforestation"
+                                                className={`h-14 bg-white/5 border ${errors.project_source ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-5 text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 transition-all`}
                                                 value={newListing.project_source}
-                                                onChange={(e) => setNewListing({ ...newListing, project_source: e.target.value })}
-                                            >
-                                                <option className="bg-slate-900">Amazon Reforestation</option>
-                                                <option className="bg-slate-900">Wind Farm Indonesia</option>
-                                                <option className="bg-slate-900">Solar Park Rajasthan</option>
-                                            </select>
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setNewListing({ ...newListing, project_source: val });
+                                                    validateField('project_source', val);
+                                                }}
+                                            />
                                             {errors.project_source && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.project_source}</p>}
                                         </div>
 
@@ -257,20 +381,46 @@ const SellerDashboard = () => {
                                                     placeholder="5000"
                                                     className={`h-14 bg-white/5 border ${errors.volume ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-5 text-white font-bold placeholder:text-slate-600`}
                                                     value={newListing.volume}
-                                                    onChange={(e) => setNewListing({ ...newListing, volume: e.target.value })}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setNewListing({ ...newListing, volume: val });
+                                                        validateField('volume', val);
+                                                    }}
                                                 />
                                                 {errors.volume && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.volume}</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-xs font-bold text-slate-400">Price / Ton</Label>
-                                                <Input
-                                                    placeholder="₹20.00"
-                                                    className={`h-14 bg-white/5 border ${errors.price ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-5 text-white font-bold placeholder:text-slate-600`}
-                                                    value={newListing.price}
-                                                    onChange={(e) => setNewListing({ ...newListing, price: e.target.value })}
-                                                />
+                                                <div className="relative group">
+                                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-lg pointer-events-none group-focus-within:scale-110 transition-transform">₹</span>
+                                                    <Input
+                                                        placeholder="20.00"
+                                                        className={`h-14 bg-white/5 border ${errors.price ? 'border-rose-500' : 'border-white/10'} rounded-2xl pl-10 pr-5 text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 transition-all`}
+                                                        value={newListing.price}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setNewListing({ ...newListing, price: val });
+                                                            validateField('price', val);
+                                                        }}
+                                                    />
+                                                </div>
                                                 {errors.price && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.price}</p>}
                                             </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-slate-400">Vintage Cycle</Label>
+                                            <Input
+                                                placeholder="2024"
+                                                className={`h-14 bg-white/5 border ${errors.vintage ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-5 text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 transition-all`}
+                                                value={newListing.vintage}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setNewListing({ ...newListing, vintage: val });
+                                                    validateField('vintage', val);
+                                                }}
+                                            />
+                                            {errors.vintage && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.vintage}</p>}
                                         </div>
                                     </div>
 
@@ -284,12 +434,22 @@ const SellerDashboard = () => {
                                                 type="file"
                                                 id="cert-upload"
                                                 className="hidden"
-                                                onChange={(e) => setUploadedFile(e.target.files[0])}
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    setUploadedFile(file);
+                                                    if (file) {
+                                                        setErrors(prev => {
+                                                            const n = { ...prev };
+                                                            delete n.certificate_file;
+                                                            return n;
+                                                        });
+                                                    }
+                                                }}
                                                 accept=".pdf,.jpg,.png"
                                             />
                                             <label
                                                 htmlFor="cert-upload"
-                                                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/10 rounded-2xl bg-white/5 hover:bg-emerald-500/5 hover:border-emerald-500/30 transition-all cursor-pointer group"
+                                                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed ${errors.certificate_file ? 'border-rose-500 bg-rose-500/5' : 'border-white/10 bg-white/5'} rounded-2xl hover:bg-emerald-500/5 hover:border-emerald-500/30 transition-all cursor-pointer group`}
                                             >
                                                 {uploadedFile ? (
                                                     <div className="flex flex-col items-center gap-2">
@@ -309,6 +469,7 @@ const SellerDashboard = () => {
                                                     </div>
                                                 )}
                                             </label>
+                                            {errors.certificate_file && <p className="text-[10px] text-rose-500 font-bold uppercase tracking-wider mt-2 ml-1">{errors.certificate_file}</p>}
                                         </div>
                                     </div>
                                 </div>
@@ -328,13 +489,18 @@ const SellerDashboard = () => {
                                                 if (file) {
                                                     setCoverImage(file);
                                                     setCoverImagePreview(URL.createObjectURL(file));
+                                                    setErrors(prev => {
+                                                        const n = { ...prev };
+                                                        delete n.cover_image;
+                                                        return n;
+                                                    });
                                                 }
                                             }}
                                             accept="image/*"
                                         />
                                         <label
                                             htmlFor="cover-upload"
-                                            className="flex flex-col items-center justify-center w-full h-[320px] border-2 border-dashed border-white/10 rounded-[2rem] bg-white/5 hover:bg-blue-500/5 hover:border-blue-500/30 transition-all cursor-pointer group overflow-hidden relative"
+                                            className={`flex flex-col items-center justify-center w-full h-[320px] border-2 border-dashed ${errors.cover_image ? 'border-rose-500 bg-rose-500/5' : 'border-white/10 bg-white/5'} rounded-[2rem] hover:bg-blue-500/5 hover:border-blue-500/30 transition-all cursor-pointer group overflow-hidden relative`}
                                         >
                                             {coverImagePreview ? (
                                                 <div className="relative w-full h-full">
@@ -356,38 +522,81 @@ const SellerDashboard = () => {
                                                 </div>
                                             )}
                                         </label>
+                                        {errors.cover_image && <p className="text-[10px] text-rose-500 font-bold uppercase tracking-wider mt-2 ml-4">{errors.cover_image}</p>}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="p-10 bg-white/5 flex justify-end gap-4 rounded-b-[2.5rem]">
+                            <div className="p-6 bg-white/5 flex justify-end gap-4 rounded-b-[2.5rem]">
                                 <Button
                                     variant="ghost"
                                     className="h-14 px-8 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5"
-                                    onClick={() => setIsListingOpen(false)}
+                                    onClick={() => {
+                                        setIsListingOpen(false);
+                                        setUploadedFile(null);
+                                        setCoverImage(null);
+                                        setCoverImagePreview(null);
+                                        setNewListing({
+                                            project_source: '',
+                                            volume: '',
+                                            price: '',
+                                            type: 'Nature',
+                                            vintage: 2024
+                                        });
+                                        setErrors({});
+                                    }}
                                 >
                                     Abort
                                 </Button>
                                 <Button
                                     className="h-14 px-12 rounded-2xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-900/40 hover:bg-emerald-500 transition-all"
                                     onClick={async () => {
-                                        if (!validateListing()) return;
+                                        if (!validateListing(newListing, { certificate_file: uploadedFile, cover_image: coverImage })) return;
 
-                                        const res = await fetch('/api/listings', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                ...newListing,
-                                                certificate_file: uploadedFile ? uploadedFile.name : null,
-                                                cover_image: coverImage ? coverImage.name : null
-                                            })
-                                        });
-                                        if (res.ok) {
-                                            setIsListingOpen(false);
-                                            setUploadedFile(null);
-                                            setErrors({});
-                                            runAction('Listing creation');
-                                            fetchData();
+                                        try {
+                                            const formData = new FormData();
+                                            formData.append('project_source', newListing.project_source);
+                                            formData.append('volume', newListing.volume);
+
+                                            const cleanPrice = String(newListing.price).replace(/[₹,]/g, '').trim();
+                                            formData.append('price', cleanPrice);
+
+                                            formData.append('type', newListing.type);
+                                            formData.append('vintage', newListing.vintage);
+
+                                            if (uploadedFile) {
+                                                formData.append('certificate_file', uploadedFile);
+                                            }
+                                            if (coverImage) {
+                                                formData.append('cover_image', coverImage);
+                                            }
+
+                                            const res = await fetch('/api/listings', {
+                                                method: 'POST',
+                                                body: formData
+                                            });
+                                            if (res.ok) {
+                                                setIsListingOpen(false);
+                                                setUploadedFile(null);
+                                                setCoverImage(null);
+                                                setCoverImagePreview(null);
+                                                setNewListing({
+                                                    project_source: '',
+                                                    volume: '',
+                                                    price: '',
+                                                    type: 'Nature',
+                                                    vintage: 2024
+                                                });
+                                                setErrors({});
+                                                runAction('Listing creation');
+                                                fetchData();
+                                            } else {
+                                                const errData = await res.json().catch(() => ({}));
+                                                runError(errData.error || 'Failed to publish');
+                                            }
+                                        } catch (error) {
+                                            console.error("Publish error:", error);
+                                            runError('Server unreachable');
                                         }
                                     }}
                                 >
@@ -399,13 +608,13 @@ const SellerDashboard = () => {
 
                     {/* Edit Listing Dialog */}
                     <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                        <DialogContent className="max-w-4xl glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-0 overflow-hidden shadow-2xl">
-                            <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 p-12 border-b border-white/10">
-                                <DialogTitle className="text-4xl font-black tracking-tight mb-2">Modify Asset Configuration</DialogTitle>
-                                <p className="text-slate-400 font-medium font-lg">Adjust performance and market parameters for CRT-{editingListing?.id}</p>
+                        <DialogContent className="max-w-4xl glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-0 shadow-2xl overflow-y-auto max-h-[90vh] scrollbar-hide">
+                            <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 p-8 border-b border-white/10">
+                                <DialogTitle className="text-2xl font-black tracking-tight mb-1">Modify Asset Configuration</DialogTitle>
+                                <p className="text-slate-400 font-medium text-sm">Adjust performance and market parameters for CRT-{editingListing?.id}</p>
                             </div>
 
-                            <div className="p-12 grid grid-cols-1 md:grid-cols-12 gap-12">
+                            <div className="p-8 grid grid-cols-1 md:grid-cols-12 gap-8">
                                 <div className="md:col-span-7 space-y-10">
                                     <div className="space-y-6">
                                         <div className="flex items-center gap-3">
@@ -419,10 +628,15 @@ const SellerDashboard = () => {
                                             <Label className="text-xs font-bold text-slate-400 ml-1">Project Identifier/Source</Label>
                                             <Input
                                                 placeholder="e.g., Amazon Reforestation"
-                                                className="h-16 bg-white/5 border-white/10 rounded-2xl px-6 text-xl font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                                className={`h-16 bg-white/5 border ${errors.project_source ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-6 text-xl font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all`}
                                                 value={editingListing?.project_source || ''}
-                                                onChange={(e) => setEditingListing({ ...editingListing, project_source: e.target.value })}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditingListing({ ...editingListing, project_source: val });
+                                                    validateField('project_source', val);
+                                                }}
                                             />
+                                            {errors.project_source && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.project_source}</p>}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-6">
@@ -430,19 +644,32 @@ const SellerDashboard = () => {
                                                 <Label className="text-xs font-bold text-slate-400 ml-1">Asset volume (Tons)</Label>
                                                 <Input
                                                     placeholder="5000"
-                                                    className="h-16 bg-white/5 border-white/10 rounded-2xl px-6 text-lg font-black text-white"
+                                                    className={`h-16 bg-white/5 border ${errors.volume ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-6 text-lg font-black text-white`}
                                                     value={editingListing?.volume || ''}
-                                                    onChange={(e) => setEditingListing({ ...editingListing, volume: e.target.value })}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setEditingListing({ ...editingListing, volume: val });
+                                                        validateField('volume', val);
+                                                    }}
                                                 />
+                                                {errors.volume && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.volume}</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-xs font-bold text-slate-400 ml-1">Market Price / Ton</Label>
-                                                <Input
-                                                    placeholder="₹20.00"
-                                                    className="h-16 bg-white/5 border-white/10 rounded-2xl px-6 text-lg font-black text-emerald-400"
-                                                    value={editingListing?.price || ''}
-                                                    onChange={(e) => setEditingListing({ ...editingListing, price: e.target.value })}
-                                                />
+                                                <div className="relative group">
+                                                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-400 font-black text-xl pointer-events-none group-focus-within:scale-110 transition-transform">₹</span>
+                                                    <Input
+                                                        placeholder="20.00"
+                                                        className={`h-16 bg-white/5 border ${errors.price ? 'border-rose-500' : 'border-white/10'} rounded-2xl pl-12 pr-6 text-lg font-black text-emerald-400 focus:ring-2 focus:ring-indigo-500 transition-all`}
+                                                        value={editingListing?.price || ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setEditingListing({ ...editingListing, price: val });
+                                                            validateField('price', val);
+                                                        }}
+                                                    />
+                                                </div>
+                                                {errors.price && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.price}</p>}
                                             </div>
                                         </div>
 
@@ -464,10 +691,15 @@ const SellerDashboard = () => {
                                                 <Input
                                                     type="number"
                                                     placeholder="2024"
-                                                    className="h-16 bg-white/5 border-white/10 rounded-2xl px-6 text-lg font-black text-white"
+                                                    className={`h-16 bg-white/5 border ${errors.vintage ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-6 text-lg font-black text-white`}
                                                     value={editingListing?.vintage || 2024}
-                                                    onChange={(e) => setEditingListing({ ...editingListing, vintage: e.target.value })}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setEditingListing({ ...editingListing, vintage: val });
+                                                        validateField('vintage', val);
+                                                    }}
                                                 />
+                                                {errors.vintage && <p className="text-xs text-rose-500 font-medium ml-1 mt-1">{errors.vintage}</p>}
                                             </div>
                                         </div>
                                     </div>
@@ -501,7 +733,7 @@ const SellerDashboard = () => {
                                         >
                                             {coverImagePreview || editingListing?.cover_image ? (
                                                 <div className="relative w-full h-full">
-                                                    <img src={coverImagePreview || editingListing?.cover_image} alt="Cover Preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                    <img src={coverImagePreview || (editingListing?.cover_image?.startsWith('http') ? editingListing?.cover_image : `http://localhost:3005/uploads/${editingListing?.cover_image}`)} alt="Cover Preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
                                                         <ImageIcon className="w-8 h-8 mb-2" />
                                                         <p className="text-xs font-black uppercase tracking-widest text-center">Swap Presentation<br />Asset</p>
@@ -538,7 +770,7 @@ const SellerDashboard = () => {
 
                     {/* View Public Profile Dialog */}
                     <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-                        <DialogContent className="max-w-lg bg-white">
+                        <DialogContent className="max-w-lg bg-white overflow-y-auto max-h-[90vh] scrollbar-hide">
                             <DialogHeader>
                                 <DialogTitle className="text-2xl font-black text-slate-900">Public Profile Preview</DialogTitle>
                                 <CardDescription className="text-slate-500">This is how buyers see your seller profile</CardDescription>
@@ -564,7 +796,7 @@ const SellerDashboard = () => {
                                     </div>
                                     <div className="p-3 bg-emerald-50 rounded-lg">
                                         <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Active Credits</p>
-                                        <p className="text-2xl font-black text-emerald-900 mt-1">{totalCreditsAvailable.toLocaleString()}</p>
+                                        <p className="text-2xl font-black text-emerald-900 mt-1">{totalCreditsAvailable.toLocaleString('en-IN')}</p>
                                     </div>
                                 </div>
                                 <p className="text-xs text-slate-500 italic text-center">This profile is visible to all marketplace buyers</p>
@@ -577,7 +809,7 @@ const SellerDashboard = () => {
 
                     {/* Activate Elite Dialog */}
                     <Dialog open={isEliteOpen} onOpenChange={setIsEliteOpen}>
-                        <DialogContent className="max-w-lg bg-white">
+                        <DialogContent className="max-w-lg bg-white overflow-y-auto max-h-[90vh] scrollbar-hide">
                             <DialogHeader>
                                 <DialogTitle className="text-2xl font-black flex items-center gap-2 text-slate-900">
                                     <ShieldCheck className="w-6 h-6 text-emerald-600" />
@@ -630,7 +862,7 @@ const SellerDashboard = () => {
 
                     {/* Delete Confirmation Dialog */}
                     <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                        <DialogContent className="max-w-md bg-white">
+                        <DialogContent className="max-w-md bg-white overflow-y-auto max-h-[90vh] scrollbar-hide">
                             <DialogHeader>
                                 <DialogTitle className="text-2xl font-black flex items-center gap-2 text-rose-600">
                                     <AlertCircle className="w-6 h-6" />
@@ -647,9 +879,9 @@ const SellerDashboard = () => {
                                         {deletingListing?.project_source}
                                     </p>
                                     <div className="flex items-center gap-4 mt-3 text-xs text-slate-600">
-                                        <span className="font-bold">{deletingListing?.volume} tons</span>
+                                        <span className="font-bold">{Number(deletingListing?.volume).toLocaleString('en-IN')} tons</span>
                                         <span className="text-slate-400">•</span>
-                                        <span className="font-bold">₹{deletingListing?.price}/ton</span>
+                                        <span className="font-bold">₹{Number(deletingListing?.price).toLocaleString('en-IN')}/ton</span>
                                     </div>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-4 text-center italic">
@@ -674,9 +906,9 @@ const SellerDashboard = () => {
             </div>
 
             <div id="portfolio" className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard title="Total Sales" value={`₹${totalSales.toLocaleString()}`} change="18.2%" icon={IndianRupee} trend="up" color="bg-emerald-500" />
-                <StatCard title="Credits Available" value={totalCreditsAvailable.toLocaleString()} change="4.1%" icon={Leaf} trend="up" color="bg-teal-500" />
-                <StatCard title="Sold to Date" value={soldToDate.toLocaleString()} change="2.3%" icon={CheckCircle2} trend="down" color="bg-blue-500" />
+                <StatCard title="Total Sales" value={`₹${totalSales.toLocaleString('en-IN')}`} change="18.2%" icon={IndianRupee} trend="up" color="bg-emerald-500" />
+                <StatCard title="Credits Available" value={totalCreditsAvailable.toLocaleString('en-IN')} change="4.1%" icon={Leaf} trend="up" color="bg-teal-500" />
+                <StatCard title="Sold to Date" value={soldToDate.toLocaleString('en-IN')} change="2.3%" icon={CheckCircle2} trend="down" color="bg-blue-500" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -687,10 +919,22 @@ const SellerDashboard = () => {
                             <CardDescription className="text-slate-500 font-medium">Your active carbon credit offers on the exchange</CardDescription>
                         </div>
                         <div className="flex items-center gap-3">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 gap-3"
+                                onClick={() => handleDownloadCSV(listings, 'market-listings')}
+                            >
+                                <Download className="w-5 h-5 text-emerald-400" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Export All</span>
+                            </Button>
                             <div className="relative">
                                 <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                                 <input className="pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white w-56 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600" placeholder="Search orders..." />
                             </div>
+                            <Button variant="ghost" size="sm" onClick={fetchData} className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 mr-2 hover:text-emerald-400 transition-colors" title="Refresh Data">
+                                <RefreshCw className="w-5 h-5" />
+                            </Button>
                             <Button variant="ghost" size="sm" className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400">
                                 <Filter className="w-5 h-5" />
                             </Button>
@@ -729,7 +973,7 @@ const SellerDashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
-                                    {listings.filter(item => item.status !== 'In Review').map((item, i) => (
+                                    {listings.map((item, i) => (
                                         <tr key={i} className="group hover:bg-white/[0.02] transition-colors cursor-default">
                                             <td className="px-10 py-8">
                                                 <span className="text-xs font-mono font-black text-slate-500 bg-white/5 px-2 py-1 rounded-md">CRT-{item.id}</span>
@@ -747,22 +991,22 @@ const SellerDashboard = () => {
                                             </td>
 
                                             <td className="px-10 py-8">
-                                                <p className="text-sm font-black text-white">₹{Number(item.price).toFixed(2)}</p>
+                                                <p className="text-sm font-black text-white">₹{Number(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                                                 <p className="text-[10px] text-emerald-500 font-bold mt-1.5">Market Spot</p>
                                             </td>
                                             <td className="px-10 py-8">
                                                 <div className="flex flex-col gap-2.5 w-36">
                                                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                                        <span className={item.status === 'Sold Out' ? 'text-rose-400' : 'text-emerald-400'}>
-                                                            {item.status === 'Active' ? 'Verified' : item.status}
+                                                        <span className={item.status === 'Sold Out' ? 'text-rose-400' : item.status === 'In Review' ? 'text-amber-400' : 'text-emerald-400'}>
+                                                            {item.status === 'Active' ? 'Verified' : item.status === 'In Review' ? 'Under Protocol' : item.status}
                                                         </span>
                                                         <span className="text-slate-500">{item.fill_percentage}%</span>
                                                     </div>
                                                     <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                                                         <div
-                                                            className={`h-full transition-all duration-[1500ms] ${item.status === 'Sold Out' ? 'bg-rose-500' : 'bg-emerald-500'
+                                                            className={`h-full transition-all duration-[1500ms] ${item.status === 'Sold Out' ? 'bg-rose-500' : item.status === 'In Review' ? 'bg-amber-500' : 'bg-emerald-500'
                                                                 } shadow-[0_0_10px_rgba(16,185,129,0.3)]`}
-                                                            style={{ width: `${item.fill_percentage}%` }}
+                                                            style={{ width: `${item.status === 'In Review' ? 5 : item.fill_percentage}%` }}
                                                         />
                                                     </div>
                                                 </div>
@@ -801,6 +1045,34 @@ const SellerDashboard = () => {
                                                                 Liquidate Listing
                                                             </button>
                                                         </div>
+                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-slate-500 transition-all ml-2"
+                                                        onClick={() => handleDownloadSingle(item)}
+                                                        title="Download Details"
+                                                    >
+                                                        <Download className="w-4 h-4" />
+                                                    </Button>
+                                                    {item.certificate_file && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-blue-500/10 hover:text-blue-400 text-slate-500 transition-all ml-2"
+                                                            onClick={() => {
+                                                                const link = document.createElement('a');
+                                                                link.href = `http://localhost:3005/uploads/${item.certificate_file}`;
+                                                                link.download = item.certificate_file;
+                                                                link.target = "_blank";
+                                                                document.body.appendChild(link);
+                                                                link.click();
+                                                                document.body.removeChild(link);
+                                                            }}
+                                                            title="Download Certificate"
+                                                        >
+                                                            <FileText className="w-4 h-4" />
+                                                        </Button>
                                                     )}
                                                 </div>
                                             </td>
@@ -917,7 +1189,7 @@ const SellerDashboard = () => {
                                 <div key={i} className="flex-1 group relative h-full flex flex-col justify-end">
                                     <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-20">
                                         <span className="glass-morphism-heavy text-white text-[10px] font-black px-3 py-1.5 rounded-xl border border-white/20 shadow-2xl">
-                                            {chartView === 'revenue' ? `₹${d.value.toLocaleString()}` : `${d.value} tCO2e`}
+                                            {chartView === 'revenue' ? `₹${d.value.toLocaleString('en-IN')}` : `${d.value.toLocaleString('en-IN')} tCO2e`}
                                         </span>
                                     </div>
                                     <div
@@ -965,8 +1237,8 @@ const SellerDashboard = () => {
                                         </div>
                                         <div className="flex justify-between items-end">
                                             <div>
-                                                <p className="text-xs font-black text-slate-400">{tx.credits} tCO2e</p>
-                                                <p className="text-lg font-black premium-gradient-text mt-0.5">{tx.amount}</p>
+                                                <p className="text-xs font-black text-slate-400">{Number(tx.credits).toLocaleString('en-IN')} tCO2e</p>
+                                                <p className="text-lg font-black premium-gradient-text mt-0.5">₹{Number(tx.amount).toLocaleString('en-IN')}</p>
                                             </div>
                                             <div className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border ${tx.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
                                                 }`}>
@@ -985,7 +1257,7 @@ const SellerDashboard = () => {
             </div>
 
 
-        </div>
+        </div >
     );
 };
 

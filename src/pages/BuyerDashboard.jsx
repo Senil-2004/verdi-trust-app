@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { ShoppingCart, Award, Globe, LineChart, Search, Filter, ArrowUpRight, CheckCircle2, TrendingUp, Download, Leaf, ShieldCheck, Calendar, Zap, Info, CreditCard, Lock, Wallet } from 'lucide-react';
+import { ShoppingCart, Award, Globe, LineChart, Search, Filter, ArrowUpRight, CheckCircle2, TrendingUp, Download, Leaf, ShieldCheck, Calendar, Zap, Info, CreditCard, Lock, Wallet, FileText } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -51,21 +51,27 @@ const BuyerDashboard = () => {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '' });
 
+    const [monthlyData, setMonthlyData] = useState([]);
+
+    // ... (other states)
+
     const fetchData = async () => {
         setLoading(true);
         setError(null);
         try {
-            const [statsRes, listingsRes, projectsRes] = await Promise.all([
+            const [statsRes, listingsRes, projectsRes, transactionsRes] = await Promise.all([
                 fetch('/api/buyer/stats'),
                 fetch('/api/listings'),
-                fetch('/api/projects')
+                fetch('/api/projects'),
+                fetch('/api/transactions')
             ]);
 
-            if (!statsRes.ok || !listingsRes.ok || !projectsRes.ok) throw new Error('Systems Connectivity Issue');
+            if (!statsRes.ok || !listingsRes.ok || !projectsRes.ok || !transactionsRes.ok) throw new Error('Systems Connectivity Issue');
 
             const statsData = await statsRes.json();
             const listingsData = await listingsRes.json();
             const projectsData = await projectsRes.json();
+            const transactionsData = await transactionsRes.json();
 
             setStats({
                 totalCredits: Number(statsData.totalCredits) || 0,
@@ -73,14 +79,35 @@ const BuyerDashboard = () => {
                 activeProjects: Number(statsData.activeProjects) || 0
             });
 
+            // Process Monthly Data
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const currentYear = new Date().getFullYear();
+            const monthlyVolumes = new Array(12).fill(0);
+
+            transactionsData.forEach(t => {
+                const date = new Date(t.transaction_date);
+                if (date.getFullYear() === currentYear) {
+                    monthlyVolumes[date.getMonth()] += Number(t.credits);
+                }
+            });
+
+            const maxVolume = Math.max(...monthlyVolumes, 100); // 100 as fallback max
+            const processedMonthlyData = months.map((month, i) => ({
+                month,
+                volume: monthlyVolumes[i],
+                percentage: (monthlyVolumes[i] / maxVolume) * 100
+            }));
+
+            setMonthlyData(processedMonthlyData);
+
             setProjects(listingsData.filter(item => item.status !== 'In Review').map(item => ({
                 id: item.id,
                 title: item.project_source,
                 origin: item.project_source.includes('Amazon') ? 'Brazil' : item.project_source.includes('Indonesia') ? 'Indonesia' : 'India',
-                price: `₹${item.price}/ton`,
+                price: `₹${Number(item.price).toLocaleString('en-IN')}/ton`,
                 rating: "AAA",
                 img: item.cover_image
-                    ? `https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80`
+                    ? (item.cover_image.startsWith('http') ? item.cover_image : `http://localhost:3005/uploads/${item.cover_image}`)
                     : (item.project_source.includes('Amazon') ? 'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?auto=format&fit=crop&w=1200&q=80' :
                         item.project_source.includes('Wind') ? 'https://images.unsplash.com/photo-1466611653911-954ff21caaf0?auto=format&fit=crop&w=1200&q=80' :
                             'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80'),
@@ -88,12 +115,13 @@ const BuyerDashboard = () => {
                 description: `Certified ${item.type} carbon sequestration project. This institutional-grade asset represents verifiable climate impact with Tier-1 integrity.`,
                 vintage: item.vintage,
                 standard: "Verra (VCS)",
-                volume: `${item.volume} tCO2e`,
+                volume: `${Number(item.volume).toLocaleString('en-IN')} tCO2e`,
                 developer: "VerdiTrust Verified",
-                status: item.status
+                status: item.status,
+                certificate_file: item.certificate_file
             })));
 
-            setPendingProjects(projectsData.map(p => ({ ...p, date: new Date(p.submitted_at).toLocaleDateString() })));
+            setPendingProjects(projectsData.map(p => ({ ...p, date: new Date(p.submitted_at).toLocaleDateString('en-IN') })));
         } catch (err) {
             setError(err.message);
         } finally {
@@ -162,13 +190,30 @@ const BuyerDashboard = () => {
         rzp.open();
     };
 
+    const handleDownloadCSV = (data, fileName) => {
+        const headers = ["Project Name", "Origin", "Price", "Vintage", "Standard", "Volume", "Status", "Certificate URL"];
+        const csvContent = "data:text/csv;charset=utf-8,"
+            + headers.join(",") + "\n"
+            + data.map(p => {
+                const certUrl = p.certificate_file ? `http://localhost:3005/uploads/${p.certificate_file}` : 'N/A';
+                return `"${p.title || p.name}","${p.origin || 'N/A'}",${String(p.price || '').replace(/[₹,]/g, '')},${p.vintage || 'N/A'},"${p.standard || 'N/A'}","${p.volume || 'N/A'}","${p.status}","${certUrl}"`;
+            }).join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${fileName}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const runAction = (label) => {
         setActionStatus({ type: label, active: true });
         setTimeout(() => setActionStatus({ type: '', active: false }), 3000);
     };
 
     return (
-        <div className="p-12 max-w-7xl mx-auto space-y-16 animate-in fade-in duration-1000">
+        <div className="p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-1000">
             {/* Action Toast */}
             {actionStatus.active && (
                 <div className="fixed bottom-12 right-12 z-50 animate-in slide-in-from-right-10">
@@ -180,7 +225,7 @@ const BuyerDashboard = () => {
             )}
 
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-0 overflow-hidden max-w-4xl">
+                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-0 shadow-2xl max-w-4xl overflow-y-auto max-h-[90vh] scrollbar-hide">
                     <div className="h-80 relative">
                         <img src={selectedProject?.img} className="w-full h-full object-cover" alt="" />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#080c0a] via-[#080c0a]/40 to-transparent" />
@@ -208,12 +253,33 @@ const BuyerDashboard = () => {
                                     <p className="text-sm font-black text-slate-300">{selectedProject?.standard}</p>
                                 </div>
                             </div>
+                            {selectedProject?.certificate_file && (
+                                <div className="pt-8 block">
+                                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">Verification Artifacts</h4>
+                                    <a
+                                        href={`http://localhost:3005/uploads/${selectedProject.certificate_file}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download
+                                        className="flex items-center gap-4 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all w-fit group"
+                                    >
+                                        <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
+                                            <FileText className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-black text-white uppercase tracking-widest">Protocol Certificate</p>
+                                            <p className="text-[10px] text-slate-500 font-bold mt-0.5">{selectedProject.certificate_file}</p>
+                                        </div>
+                                        <Download className="w-4 h-4 ml-4 text-slate-600 group-hover:text-emerald-400 transition-colors" />
+                                    </a>
+                                </div>
+                            )}
                         </div>
                         <div className="md:col-span-5 glass-morphism rounded-3xl p-8 border-white/5 flex flex-col justify-between">
                             <div className="space-y-6">
                                 <div>
                                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">Available Liquidity</p>
-                                    <p className="text-3xl font-black text-white">{selectedProject?.volume}</p>
+                                    <p className="text-3xl font-black text-white">{Number(selectedProject?.volume?.replace(/[^0-9]/g, '') || 0).toLocaleString('en-IN')} tCO2e</p>
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">Institutional Price</p>
@@ -235,14 +301,14 @@ const BuyerDashboard = () => {
             </Dialog>
 
             <Dialog open={isPurchaseOpen} onOpenChange={setIsPurchaseOpen}>
-                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[2.5rem] p-10 max-w-lg w-full">
+                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[2.5rem] p-8 shadow-2xl max-w-lg w-full overflow-y-auto max-h-[90vh] scrollbar-hide">
                     <DialogHeader>
                         <DialogTitle className="text-3xl font-black tracking-tight">Purchase Credits</DialogTitle>
                         <CardDescription className="text-slate-400 font-medium text-base mt-2">
                             Deploying capital into {selectedProject?.title}
                         </CardDescription>
                     </DialogHeader>
-                    <div className="space-y-6 py-10">
+                    <div className="space-y-4 py-8">
                         <div className="space-y-3">
                             <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Inventory Quantity (Tons)</Label>
                             <Input
@@ -257,7 +323,7 @@ const BuyerDashboard = () => {
                             <div className="p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 flex justify-between items-center">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Estimated Value</span>
                                 <span className="text-3xl font-black text-emerald-400 tracking-tight">
-                                    ₹{(parseFloat(selectedProject.price.replace('₹', '').replace('/ton', '')) * parseInt(purchaseQty || '0')).toLocaleString()}
+                                    ₹{(parseFloat(selectedProject.price.replace(/[₹,]/g, '').replace('/ton', '')) * parseInt(purchaseQty || '0')).toLocaleString('en-IN')}
                                 </span>
                             </div>
                         )}
@@ -337,18 +403,7 @@ const BuyerDashboard = () => {
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 relative">
                 <div className="absolute top-[-20px] left-[-20px] w-24 h-24 bg-emerald-500/10 rounded-full blur-[60px] -z-10" />
 
-                <div className="flex gap-4">
-                    <Button onClick={() => navigate('/seller-onboarding')} className="h-14 px-10 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-900/20 active:scale-[0.98]">
-                        Become a Seller
-                    </Button>
-                </div>
             </header>
-
-            <div id="portfolio" className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                <PortfolioStat label="Aggregated Offset" value={`${stats.totalCredits.toLocaleString()}`} icon={Award} color="text-emerald-500" trend="12.5" />
-                <PortfolioStat label="Impact Regions" value={`${stats.activeProjects}`} icon={Globe} color="text-blue-500" trend="3.2" />
-                <PortfolioStat label="Liquidity Value" value={`₹${stats.totalSpent.toLocaleString()}`} icon={LineChart} color="text-teal-400" trend="21.8" />
-            </div>
 
             {error && (
                 <div className="glass-morphism p-12 rounded-[3rem] border-rose-500/20 flex flex-col items-center gap-6 text-center animate-in zoom-in">
@@ -364,13 +419,7 @@ const BuyerDashboard = () => {
             )}
 
             <div className="space-y-12">
-                <div id="marketplace" className="flex items-end justify-between border-b border-white/5 pb-8">
-                    <div>
-                        <h2 className="text-4xl font-black text-white tracking-tight">Prime Market.</h2>
-                        <p className="text-slate-500 font-medium mt-2">Institutional-grade offsets with Tier 1 verification.</p>
-                    </div>
-                    <Button variant="ghost" className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 hover:text-emerald-400">Expand Marketplace [ALT+M]</Button>
-                </div>
+
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                     {loading ? [1, 2, 3].map(i => <div key={i} className="h-[500px] glass-morphism rounded-[3rem] animate-pulse" />) :
@@ -408,9 +457,20 @@ const BuyerDashboard = () => {
             </div>
 
             <section className="space-y-10 py-12">
-                <div className="flex items-center gap-4 border-b border-white/5 pb-8">
-                    <h2 className="text-3xl font-black text-white tracking-tight">Project Pipeline.</h2>
-                    <span className="p-1 px-3 glass-morphism rounded-full text-[9px] font-black uppercase text-slate-500 tracking-[0.2em]">Live Audits</span>
+                <div className="flex items-center justify-between border-b border-white/5 pb-8">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-3xl font-black text-white tracking-tight">Project Pipeline.</h2>
+                        <span className="p-1 px-3 glass-morphism rounded-full text-[9px] font-black uppercase text-slate-500 tracking-[0.2em]">Live Audits</span>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 px-6 rounded-xl border border-white/10 hover:border-emerald-500/30 hover:bg-emerald-500/5 text-slate-400 hover:text-emerald-400 gap-3 transition-all"
+                        onClick={() => handleDownloadCSV(pendingProjects, 'my-portfolio')}
+                    >
+                        <Download className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Export Portfolio</span>
+                    </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-white">
                     {pendingProjects.map((p, i) => (
@@ -441,21 +501,23 @@ const BuyerDashboard = () => {
                 </CardHeader>
                 <CardContent className="p-16">
                     <div className="h-80 flex items-end gap-5">
-                        {[40, 70, 45, 90, 65, 80, 100, 85, 95].map((h, i) => (
+                        {monthlyData.map((data, i) => (
                             <div key={i} className="flex-1 group relative h-full">
                                 <div className="w-full bg-white/5 rounded-3xl absolute bottom-0 h-full border border-white/5 group-hover:bg-white/10 transition-all" />
                                 <div
                                     className="w-full bg-gradient-to-t from-emerald-600 to-teal-400 rounded-3xl transition-all duration-[1.5s] absolute bottom-0 shadow-[0_0_30px_rgba(16,185,129,0.2)] group-hover:scale-y-[1.05] origin-bottom"
-                                    style={{ height: `${h}%` }}
+                                    style={{ height: `${data.percentage}%` }}
                                 />
                                 <div className="absolute -top-14 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all bg-emerald-500 text-[#080c0a] text-xs font-black px-4 py-2 rounded-2xl shadow-2xl z-20 whitespace-nowrap">
-                                    {h * 25} tCO2e
+                                    {data.volume} tCO2e
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="grid grid-cols-9 mt-12 text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] text-center">
-                        <span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span><span>JUL</span><span>AUG</span><span>SEP</span>
+                    <div className="grid grid-cols-12 mt-12 text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] text-center">
+                        {monthlyData.map((data, i) => (
+                            <span key={i}>{data.month}</span>
+                        ))}
                     </div>
                 </CardContent>
             </Card>
