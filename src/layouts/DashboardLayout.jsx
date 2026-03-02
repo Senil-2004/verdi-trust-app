@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { Leaf, LogOut, Bell, User } from 'lucide-react';
+import { Leaf, LogOut, Bell, User, Mail, Shield, Calendar, MapPin, Building2, Globe } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { CardDescription } from '../components/ui/card';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 
@@ -19,6 +21,8 @@ const DashboardLayout = () => {
     };
 
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [userProfile, setUserProfile] = useState(null);
     const notificationRef = useRef(null);
     const [notifications, setNotifications] = useState([]);
 
@@ -36,8 +40,27 @@ const DashboardLayout = () => {
         }
     };
 
+    const fetchUserProfile = async () => {
+        const email = localStorage.getItem('userEmail');
+        if (!email) return;
+
+        try {
+            const res = await fetch(`/api/users/profile?email=${email}`);
+            const data = await res.json();
+            if (res.ok) {
+                setUserProfile(data);
+                if (data.name) {
+                    localStorage.setItem('userName', data.name);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch user profile", error);
+        }
+    };
+
     useEffect(() => {
         fetchNotifications();
+        fetchUserProfile();
     }, []);
 
     const markAllAsRead = async () => {
@@ -147,10 +170,13 @@ const DashboardLayout = () => {
 
                         <div className="h-10 w-[1px] bg-white/10 mx-2"></div>
 
-                        <div className="flex items-center gap-4 pl-2">
+                        <div
+                            className="flex items-center gap-4 pl-2 cursor-pointer group hover:bg-white/5 p-1 rounded-2xl transition-all"
+                            onClick={() => setIsProfileOpen(true)}
+                        >
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-black text-white leading-none mb-1">
-                                    {localStorage.getItem('userName') || 'User'}
+                                <p className="text-sm font-black text-white leading-none mb-1 group-hover:text-emerald-400 transition-colors">
+                                    {userProfile?.name || localStorage.getItem('userName') || 'Gregory'}
                                 </p>
                                 <div className="flex items-center justify-end gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -159,10 +185,64 @@ const DashboardLayout = () => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black text-lg shadow-inner">
-                                {localStorage.getItem('userName')?.[0]?.toUpperCase() || 'U'}
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black text-lg shadow-inner group-hover:scale-110 transition-transform">
+                                {(userProfile?.name || localStorage.getItem('userName') || 'Gregory')[0].toUpperCase()}
                             </div>
                         </div>
+
+                        {/* Profile Dialog */}
+                        <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+                            <DialogContent className="max-w-md bg-[#080c0a] border border-white/10 rounded-[2.5rem] p-0 overflow-hidden shadow-2xl">
+                                <div className="relative h-32 bg-gradient-to-r from-emerald-600 to-teal-600">
+                                    <div className="absolute -bottom-12 left-10 p-1.5 bg-[#080c0a] rounded-3xl border border-white/10">
+                                        <div className="w-24 h-24 rounded-[1.25rem] bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-4xl font-black shadow-2xl">
+                                            {(userProfile?.name || localStorage.getItem('userName') || 'Gregory')[0].toUpperCase()}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="pt-16 px-10 pb-10">
+                                    <div className="flex justify-between items-start mb-8">
+                                        <div>
+                                            <h2 className="text-3xl font-black text-white">{userProfile?.name || localStorage.getItem('userName') || 'Gregory'}</h2>
+                                            <p className="text-emerald-500 font-black text-[10px] uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
+                                                <Shield className="w-3 h-3" />
+                                                Verified {getRoleLabel()}
+                                            </p>
+                                        </div>
+                                        <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                                            <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest leading-none">Status: {userProfile?.status || 'Active'}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {[
+                                                { icon: Mail, label: 'Email Address', value: localStorage.getItem('userEmail') || 'N/A' },
+                                                { icon: Shield, label: 'Access Level', value: getRoleLabel() },
+                                                { icon: Calendar, label: 'Member Since', value: userProfile?.joined_at ? new Date(userProfile.joined_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Jan 2024' },
+                                                { icon: Globe, label: 'Global Registry ID', value: `VT-${Math.random().toString(36).substr(2, 9).toUpperCase()}` }
+                                            ].map((item, i) => (
+                                                <div key={i} className="flex flex-col gap-1.5 p-4 bg-white/5 border border-white/5 rounded-2xl group/item hover:bg-white/10 transition-colors">
+                                                    <div className="flex items-center gap-2">
+                                                        <item.icon className="w-3.5 h-3.5 text-slate-500 group-hover/item:text-emerald-400 transition-colors" />
+                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{item.label}</span>
+                                                    </div>
+                                                    <p className="text-sm font-black text-white pl-5.5">{item.value}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <DialogFooter className="px-10 pb-10 pt-0 bg-transparent flex justify-normal">
+                                    <Button
+                                        onClick={() => setIsProfileOpen(false)}
+                                        className="w-full h-14 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl transition-all"
+                                    >
+                                        Close Profile Registry
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
 
                         <Button
                             variant="ghost"

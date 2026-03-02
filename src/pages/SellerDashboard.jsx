@@ -85,14 +85,22 @@ const SellerDashboard = () => {
     const [recentTransactions, setRecentTransactions] = useState([]);
 
     const handleDownloadCSV = (data, fileName) => {
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString('en-IN');
+        const dayStr = dateObj.toLocaleDateString('en-IN', { weekday: 'long' });
         const headers = ["ID", "Project Source", "Type", "Price", "Volume", "Vintage", "Status", "Certificate URL"];
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + headers.join(",") + "\n"
-            + data.map(l => {
-                const price = String(l.price || '').replace(/[₹,]/g, '');
-                const certUrl = l.certificate_file ? `http://localhost:3005/uploads/${l.certificate_file}` : 'N/A';
-                return `${l.id},"${l.project_source}","${l.type}",${price},${l.volume},${l.vintage},"${l.status}","${certUrl}"`;
-            }).join("\n");
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += '"VerdiTrust Institutional Carbon Credit Marketplace"\n';
+        csvContent += `"Date","${dateStr}"\n`;
+        csvContent += `"Day","${dayStr}"\n\n`;
+        csvContent += headers.join(",") + "\n";
+
+        csvContent += data.map(l => {
+            const price = String(l.price || '').replace(/[₹,]/g, '');
+            const certUrl = l.certificate_file ? `http://localhost:3005/uploads/${l.certificate_file}` : 'N/A';
+            return `${l.id},"${l.project_source}","${l.type}",${price},${l.volume},${l.vintage},"${l.status}","${certUrl}"`;
+        }).join("\n");
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -103,7 +111,19 @@ const SellerDashboard = () => {
     };
 
     const handleDownloadSingle = (l) => {
-        const content = `Asset Identifier: CRT-${l.id}
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString('en-IN');
+        const dayStr = dateObj.toLocaleDateString('en-IN', { weekday: 'long' });
+
+        const content = `================================================
+  [VerdiTrust Logo] VERDITRUST
+  Institutional Carbon Credit Marketplace
+
+  Date: ${dateStr}
+  Day:  ${dayStr}
+================================================
+
+Asset Identifier: CRT-${l.id}
 Source: ${l.project_source}
 Type: ${l.type}
 Price: ₹${l.price}/Ton
@@ -236,7 +256,13 @@ Certificate: ${l.certificate_file || 'N/A'}`;
             const txRes = await fetch('/api/transactions');
             const txData = await txRes.json();
             if (Array.isArray(txData)) {
-                setRecentTransactions(txData);
+                // Map database fields to UI keys
+                const mappedTx = txData.map(tx => ({
+                    ...tx,
+                    buyer: tx.buyer_name,
+                    date: tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : 'Pending'
+                }));
+                setRecentTransactions(mappedTx);
             } else {
                 console.error("Transactions API error", txData);
             }
@@ -770,57 +796,70 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
                     {/* View Public Profile Dialog */}
                     <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-                        <DialogContent className="max-w-lg bg-white overflow-y-auto max-h-[90vh] scrollbar-hide">
+                        <DialogContent className="max-w-md bg-white rounded-[2.5rem] p-10 overflow-hidden shadow-2xl border-none">
                             <DialogHeader>
-                                <DialogTitle className="text-2xl font-black text-slate-900">Public Profile Preview</DialogTitle>
-                                <CardDescription className="text-slate-500">This is how buyers see your seller profile</CardDescription>
+                                <DialogTitle className="text-4xl font-black text-slate-900 leading-tight">Public Profile Preview</DialogTitle>
+                                <CardDescription className="text-slate-500 text-lg font-medium mt-2">This is how buyers see your seller profile</CardDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-                                    <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-black text-2xl border-2 border-emerald-200">
-                                        {localStorage.getItem('userName')?.[0]?.toUpperCase() || 'S'}
+
+                            <div className="mt-10 space-y-8">
+                                {/* Profile Card */}
+                                <div className="p-8 bg-slate-50/50 rounded-[2rem] flex items-center gap-6 border border-slate-100">
+                                    <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-black text-4xl border-4 border-white shadow-sm shrink-0">
+                                        {(localStorage.getItem('userName') || 'Gregory')[0].toUpperCase()}
                                     </div>
                                     <div>
-                                        <h3 className="font-black text-lg text-slate-900">{localStorage.getItem('userName') || 'Seller'}</h3>
-                                        <p className="text-xs text-slate-500 font-medium">Verified Carbon Seller</p>
-                                        <div className="flex items-center gap-1 mt-1">
-                                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                            <span className="text-[10px] font-bold text-emerald-600 uppercase">Verified</span>
+                                        <h3 className="font-black text-2xl text-slate-900 leading-tight">{localStorage.getItem('userName') || 'Gregory'}</h3>
+                                        <p className="text-sm text-slate-500 font-medium mt-1">Verified Carbon Seller</p>
+                                        <div className="flex items-center gap-2 mt-3 bg-white w-fit px-3 py-1.5 rounded-full shadow-sm border border-slate-100">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Verified</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3 bg-blue-50 rounded-lg">
-                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Total Listings</p>
-                                        <p className="text-2xl font-black text-blue-900 mt-1">{listings.length}</p>
+
+                                {/* Stats Grid */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-6 bg-blue-50/50 rounded-[1.5rem] border border-blue-100/50">
+                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Total Listings</p>
+                                        <p className="text-4xl font-black text-blue-900">{listings.length}</p>
                                     </div>
-                                    <div className="p-3 bg-emerald-50 rounded-lg">
-                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Active Credits</p>
-                                        <p className="text-2xl font-black text-emerald-900 mt-1">{totalCreditsAvailable.toLocaleString('en-IN')}</p>
+                                    <div className="p-6 bg-emerald-50/50 rounded-[1.5rem] border border-emerald-100/50">
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4">Active Credits</p>
+                                        <p className="text-4xl font-black text-emerald-900">{totalCreditsAvailable.toLocaleString('en-IN')}</p>
                                     </div>
                                 </div>
-                                <p className="text-xs text-slate-500 italic text-center">This profile is visible to all marketplace buyers</p>
+
+                                <p className="text-sm text-slate-400 font-medium italic text-center px-4">
+                                    This profile is visible to all marketplace buyers
+                                </p>
                             </div>
-                            <DialogFooter>
-                                <Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => setIsProfileOpen(false)}>Close Preview</Button>
+
+                            <DialogFooter className="mt-10">
+                                <Button
+                                    className="w-full h-16 bg-[#00a86b] hover:bg-[#00905c] text-white text-lg font-black rounded-full shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]"
+                                    onClick={() => setIsProfileOpen(false)}
+                                >
+                                    Close Preview
+                                </Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
 
                     {/* Activate Elite Dialog */}
                     <Dialog open={isEliteOpen} onOpenChange={setIsEliteOpen}>
-                        <DialogContent className="max-w-lg bg-white overflow-y-auto max-h-[90vh] scrollbar-hide">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl font-black flex items-center gap-2 text-slate-900">
-                                    <ShieldCheck className="w-6 h-6 text-emerald-600" />
+                        <DialogContent className="max-w-lg bg-white overflow-y-auto max-h-[90vh] scrollbar-hide rounded-[2.5rem] p-10">
+                            <DialogHeader className="pr-12">
+                                <DialogTitle className="text-3xl font-black flex items-center gap-3 text-slate-900 leading-none">
+                                    <ShieldCheck className="w-8 h-8 text-emerald-600" />
                                     Elite Seller Program
                                 </DialogTitle>
-                                <CardDescription className="text-slate-500">Unlock premium features and institutional access</CardDescription>
+                                <CardDescription className="text-slate-500 mt-4 text-base font-medium leading-relaxed">Unlock premium features and institutional access</CardDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
                                 <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-                                    <h4 className="font-black text-sm text-emerald-900 mb-3">Premium Benefits</h4>
-                                    <ul className="space-y-2">
+                                    <h4 className="font-black text-base text-emerald-900 mb-5">Premium Benefits</h4>
+                                    <ul className="space-y-4">
                                         {[
                                             'Priority listing placement',
                                             'Access to institutional buyers',
@@ -828,32 +867,43 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                             'Dedicated account manager',
                                             'Reduced platform fees (1.5%)'
                                         ].map((benefit, i) => (
-                                            <li key={i} className="flex items-center gap-2 text-xs text-slate-700">
-                                                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                                                <span className="font-medium">{benefit}</span>
+                                            <li key={i} className="flex items-center gap-3 text-sm text-slate-700">
+                                                <div className="p-1 bg-emerald-100 rounded-full">
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                                                </div>
+                                                <span className="font-semibold">{benefit}</span>
                                             </li>
                                         ))}
                                     </ul>
                                 </div>
                                 <div className="p-4 bg-slate-900 rounded-xl text-white">
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-end">
                                         <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Monthly Fee</p>
-                                            <p className="text-3xl font-black mt-1">₹4,999<span className="text-sm text-slate-400">/mo</span></p>
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-2">Monthly Fee</p>
+                                            <p className="text-4xl font-black leading-none italic">₹4,999<span className="text-sm text-slate-500 font-bold not-italic ml-1">/mo</span></p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase">Save 20%</p>
-                                            <p className="text-xs font-black text-emerald-400">Annual Plan</p>
+                                        <div className="text-right pb-1">
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">SAVE 20%</p>
+                                            <p className="text-sm font-black text-emerald-400 uppercase tracking-widest">Annual Plan</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <DialogFooter className="flex gap-2">
-                                <Button variant="ghost" onClick={() => setIsEliteOpen(false)}>Maybe Later</Button>
-                                <Button className="bg-emerald-600 text-white" onClick={() => {
-                                    runAction('Elite activation');
-                                    setIsEliteOpen(false);
-                                }}>
+                            <DialogFooter className="flex justify-between items-center gap-4 mt-10">
+                                <Button
+                                    variant="ghost"
+                                    className="px-8 text-slate-500 font-black uppercase tracking-widest text-xs hover:bg-slate-50"
+                                    onClick={() => setIsEliteOpen(false)}
+                                >
+                                    Maybe Later
+                                </Button>
+                                <Button
+                                    className="px-12 py-7 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-sm rounded-full shadow-xl shadow-emerald-500/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                    onClick={() => {
+                                        runAction('Elite activation');
+                                        setIsEliteOpen(false);
+                                    }}
+                                >
                                     Activate Now
                                 </Button>
                             </DialogFooter>
@@ -862,42 +912,50 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
                     {/* Delete Confirmation Dialog */}
                     <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                        <DialogContent className="max-w-md bg-white overflow-y-auto max-h-[90vh] scrollbar-hide">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl font-black flex items-center gap-2 text-rose-600">
-                                    <AlertCircle className="w-6 h-6" />
-                                    Delete Listing?
-                                </DialogTitle>
-                                <CardDescription>This action cannot be undone</CardDescription>
+                        <DialogContent className="max-w-md glass-morphism-heavy border-white/10 text-white rounded-[2.5rem] p-8 shadow-2xl">
+                            <DialogHeader className="space-y-4">
+                                <div className="mx-auto w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center border border-rose-500/20">
+                                    <AlertCircle className="w-8 h-8 text-rose-500" />
+                                </div>
+                                <div className="text-center space-y-2">
+                                    <DialogTitle className="text-3xl font-black tracking-tight text-white m-0">
+                                        Liquidate Listing?
+                                    </DialogTitle>
+                                    <CardDescription className="text-slate-500 font-medium">This protocol action is irreversible</CardDescription>
+                                </div>
                             </DialogHeader>
-                            <div className="py-4">
-                                <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl">
-                                    <p className="text-sm text-slate-700 font-medium">
-                                        You are about to permanently delete:
-                                    </p>
-                                    <p className="text-base font-black text-slate-900 mt-2">
-                                        {deletingListing?.project_source}
-                                    </p>
-                                    <div className="flex items-center gap-4 mt-3 text-xs text-slate-600">
-                                        <span className="font-bold">{Number(deletingListing?.volume).toLocaleString('en-IN')} tons</span>
-                                        <span className="text-slate-400">•</span>
-                                        <span className="font-bold">₹{Number(deletingListing?.price).toLocaleString('en-IN')}/ton</span>
+                            <div className="py-6">
+                                <div className="p-6 bg-rose-500/5 border border-rose-500/10 rounded-3xl space-y-4">
+                                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] text-center">Termination Payload</p>
+                                    <div className="text-center">
+                                        <p className="text-xl font-black text-white">
+                                            {deletingListing?.project_source}
+                                        </p>
+                                        <div className="flex items-center justify-center gap-4 mt-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                            <span>{Number(deletingListing?.volume).toLocaleString('en-IN')} tCO2e</span>
+                                            <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                            <span>₹{Number(deletingListing?.price).toLocaleString('en-IN')}/ton</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <p className="text-xs text-slate-500 mt-4 text-center italic">
-                                    All associated data will be removed from the marketplace
+                                <p className="text-[10px] text-slate-600 mt-6 text-center font-black uppercase tracking-[0.15em] opacity-60">
+                                    All associated ledger data will be purged
                                 </p>
                             </div>
-                            <DialogFooter className="flex gap-2">
-                                <Button variant="ghost" onClick={() => setIsDeleteOpen(false)}>
-                                    Cancel
+                            <DialogFooter className="flex flex-col sm:flex-row gap-3">
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setIsDeleteOpen(false)}
+                                    className="h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-white/5 bg-white/5 hover:bg-white/10 text-slate-400 transition-all flex-1"
+                                >
+                                    Abort Action
                                 </Button>
                                 <Button
-                                    className="bg-rose-600 text-white hover:bg-rose-700"
+                                    className="h-14 bg-rose-600 text-white hover:bg-rose-500 font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-rose-900/20 transition-all flex-1"
                                     onClick={handleDeleteListing}
                                 >
                                     <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete Permanently
+                                    Confirm Liquidation
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
@@ -908,15 +966,15 @@ Certificate: ${l.certificate_file || 'N/A'}`;
             <div id="portfolio" className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard title="Total Sales" value={`₹${totalSales.toLocaleString('en-IN')}`} change="18.2%" icon={IndianRupee} trend="up" color="bg-emerald-500" />
                 <StatCard title="Credits Available" value={totalCreditsAvailable.toLocaleString('en-IN')} change="4.1%" icon={Leaf} trend="up" color="bg-teal-500" />
-                <StatCard title="Sold to Date" value={soldToDate.toLocaleString('en-IN')} change="2.3%" icon={CheckCircle2} trend="down" color="bg-blue-500" />
+                <StatCard title="Sold to Date" value={soldToDate.toLocaleString('en-IN')} change="2.3%" icon={CheckCircle2} trend="up" color="bg-blue-500" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card id="marketplace" className="lg:col-span-2 border-none glass-morphism overflow-hidden rounded-[2.5rem]">
-                    <CardHeader className="border-b border-white/5 pb-8 px-10 pt-10 flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle className="text-2xl font-black text-white">Market Listings</CardTitle>
-                            <CardDescription className="text-slate-500 font-medium">Your active carbon credit offers on the exchange</CardDescription>
+                    <CardHeader className="border-b border-white/5 py-10 px-10 flex flex-row items-center justify-between gap-8">
+                        <div className="flex flex-col justify-center">
+                            <CardTitle className="text-2xl font-black text-white leading-none">Market Listings</CardTitle>
+                            <CardDescription className="text-slate-500 font-medium mt-2 leading-tight">Your active carbon credit offers on the exchange</CardDescription>
                         </div>
                         <div className="flex items-center gap-3">
                             <Button
@@ -930,7 +988,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                             </Button>
                             <div className="relative">
                                 <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                                <input className="pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white w-56 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600" placeholder="Search orders..." />
+                                <input className="h-12 pl-10 pr-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white w-56 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600 flex items-center" placeholder="Search orders..." />
                             </div>
                             <Button variant="ghost" size="sm" onClick={fetchData} className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 mr-2 hover:text-emerald-400 transition-colors" title="Refresh Data">
                                 <RefreshCw className="w-5 h-5" />
@@ -961,41 +1019,41 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                             </div>
                         )}
 
-                        <div className="overflow-x-auto mt-8">
-                            <table className="w-full text-left">
+                        <div className="mt-8">
+                            <table className="w-full text-left table-fixed">
                                 <thead>
                                     <tr className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] border-b border-white/5">
-                                        <th className="px-10 py-6">Identifier</th>
-                                        <th className="px-10 py-6">Asset Source</th>
-                                        <th className="px-10 py-6">Price Point</th>
-                                        <th className="px-10 py-6">Market Health</th>
-                                        <th className="px-10 py-6 text-right">Actions</th>
+                                        <th className="px-8 py-6 w-32">Identifier</th>
+                                        <th className="px-4 py-6">Asset Source</th>
+                                        <th className="px-4 py-6 w-36">Price Point</th>
+                                        <th className="px-4 py-6 w-44">Market Health</th>
+                                        <th className="px-8 py-6 text-right w-40">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {listings.map((item, i) => (
                                         <tr key={i} className="group hover:bg-white/[0.02] transition-colors cursor-default">
-                                            <td className="px-10 py-8">
+                                            <td className="px-8 py-8">
                                                 <span className="text-xs font-mono font-black text-slate-500 bg-white/5 px-2 py-1 rounded-md">CRT-{item.id}</span>
                                             </td>
-                                            <td className="px-10 py-8">
+                                            <td className="px-4 py-8">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
                                                         <Leaf className="w-5 h-5 text-emerald-400" />
                                                     </div>
-                                                    <div>
-                                                        <p className="text-sm font-black text-white">{item.project_source}</p>
+                                                    <div className="truncate">
+                                                        <p className="text-sm font-black text-white truncate">{item.project_source}</p>
                                                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{item.type}</p>
                                                     </div>
                                                 </div>
                                             </td>
 
-                                            <td className="px-10 py-8">
+                                            <td className="px-4 py-8">
                                                 <p className="text-sm font-black text-white">₹{Number(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-                                                <p className="text-[10px] text-emerald-500 font-bold mt-1.5">Market Spot</p>
+                                                <p className="text-[10px] text-emerald-500 font-bold mt-1.5 uppercase tracking-widest">Market Spot</p>
                                             </td>
-                                            <td className="px-10 py-8">
-                                                <div className="flex flex-col gap-2.5 w-36">
+                                            <td className="px-4 py-8">
+                                                <div className="flex flex-col gap-2.5">
                                                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                                                         <span className={item.status === 'Sold Out' ? 'text-rose-400' : item.status === 'In Review' ? 'text-amber-400' : 'text-emerald-400'}>
                                                             {item.status === 'Active' ? 'Verified' : item.status === 'In Review' ? 'Under Protocol' : item.status}
@@ -1011,45 +1069,45 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-10 py-8 text-right">
-                                                <div className="relative">
+                                            <td className="px-8 py-8 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <div className="relative">
+                                                        <Button
+                                                            variant="ghost"
+                                                            className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center flex-shrink-0"
+                                                            onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                                                        >
+                                                            <MoreVertical className="w-4 h-4 text-slate-500" />
+                                                        </Button>
+                                                        {openMenuId === item.id && (
+                                                            <div className="absolute right-0 mt-3 w-48 glass-morphism-heavy rounded-[1.25rem] shadow-2xl border border-white/10 py-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-3xl">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        handleEditListing(item);
+                                                                        setOpenMenuId(null);
+                                                                    }}
+                                                                    className="w-full px-5 py-3 text-left text-xs font-black text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-3 transition-all"
+                                                                >
+                                                                    <Edit2 className="w-4 h-4 text-emerald-400" />
+                                                                    Modify Asset
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setDeletingListing(item);
+                                                                        setIsDeleteOpen(true);
+                                                                        setOpenMenuId(null);
+                                                                    }}
+                                                                    className="w-full px-5 py-3 text-left text-xs font-black text-rose-400 hover:bg-rose-500/10 flex items-center gap-3 transition-all"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                    Liquidate Listing
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <Button
                                                         variant="ghost"
-                                                        size="sm"
-                                                        className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all"
-                                                        onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
-                                                    >
-                                                        <MoreVertical className="w-5 h-5 text-slate-500" />
-                                                    </Button>
-                                                    {openMenuId === item.id && (
-                                                        <div className="absolute right-0 mt-3 w-48 glass-morphism-heavy rounded-[1.25rem] shadow-2xl border border-white/10 py-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-3xl">
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleEditListing(item);
-                                                                    setOpenMenuId(null);
-                                                                }}
-                                                                className="w-full px-5 py-3 text-left text-xs font-black text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-3 transition-all"
-                                                            >
-                                                                <Edit2 className="w-4 h-4 text-emerald-400" />
-                                                                Modify Asset
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setDeletingListing(item);
-                                                                    setIsDeleteOpen(true);
-                                                                    setOpenMenuId(null);
-                                                                }}
-                                                                className="w-full px-5 py-3 text-left text-xs font-black text-rose-400 hover:bg-rose-500/10 flex items-center gap-3 transition-all"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                                Liquidate Listing
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-slate-500 transition-all ml-2"
+                                                        className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-slate-500 transition-all flex items-center justify-center flex-shrink-0"
                                                         onClick={() => handleDownloadSingle(item)}
                                                         title="Download Details"
                                                     >
@@ -1058,8 +1116,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                                     {item.certificate_file && (
                                                         <Button
                                                             variant="ghost"
-                                                            size="sm"
-                                                            className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-blue-500/10 hover:text-blue-400 text-slate-500 transition-all ml-2"
+                                                            className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-blue-500/10 hover:text-blue-400 text-slate-500 transition-all flex items-center justify-center flex-shrink-0"
                                                             onClick={() => {
                                                                 const link = document.createElement('a');
                                                                 link.href = `http://localhost:3005/uploads/${item.certificate_file}`;
@@ -1097,29 +1154,32 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                     <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400 border border-emerald-500/20">
                                         <BarChart3 className="w-5 h-5" />
                                     </div>
-                                    <p className="font-black text-emerald-500 text-[10px] uppercase tracking-widest">Active Quotations</p>
+                                    <p className="font-black text-emerald-500 text-[10px] uppercase tracking-widest">Live Quotations</p>
                                 </div>
                                 <div className="flex items-end gap-3 relative z-10">
-                                    <p className="text-4xl font-black text-white tracking-tight">42</p>
-                                    <p className="text-[10px] font-black text-emerald-400 mb-2 uppercase tracking-widest">+15% Delta</p>
+                                    <p className="text-4xl font-black text-white tracking-tight">{listings.length}</p>
+                                    <p className="text-[10px] font-black text-emerald-400 mb-2 uppercase tracking-widest">Active Pool</p>
                                 </div>
                             </div>
 
                             <Card className="border-white/5 bg-white/5 shadow-none rounded-3xl border">
                                 <CardContent className="p-6 space-y-6">
                                     <div className="flex justify-between items-center">
-                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Institutional Credibility</p>
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Market Capture</p>
                                         <div className="flex gap-1">
-                                            {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />)}
+                                            {[1, 2, 3, 4, 5].map(i => <div key={i} className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)] ${i <= Math.ceil((listings.filter(l => l.status === 'Active').length / (listings.length || 1)) * 5) ? 'bg-emerald-500' : 'bg-white/10'}`} />)}
                                         </div>
                                     </div>
                                     <div className="space-y-3">
                                         <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
                                             <span>Verification Velocity</span>
-                                            <span className="text-emerald-400">98%</span>
+                                            <span className="text-emerald-400">{listings.length > 0 ? Math.round((listings.filter(l => l.status === 'Active').length / listings.length) * 100) : 0}%</span>
                                         </div>
                                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                            <div className="h-full w-[98%] bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.3)]" />
+                                            <div
+                                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all duration-1000"
+                                                style={{ width: `${listings.length > 0 ? (listings.filter(l => l.status === 'Active').length / listings.length) * 100 : 0}%` }}
+                                            />
                                         </div>
                                     </div>
                                     <Button
@@ -1227,22 +1287,24 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                 </div>
                             ) : (
                                 recentTransactions.map((tx, i) => (
-                                    <div key={i} className="p-6 hover:bg-white/[0.03] transition-colors cursor-pointer group" onClick={() => runAction(`View settlement ${tx.id}`)}>
-                                        <div className="flex justify-between items-start mb-3">
+                                    <div key={i} className="p-8 hover:bg-white/[0.03] transition-colors cursor-pointer group border-b border-white/5 last:border-none" onClick={() => runAction(`View settlement ${tx.id}`)}>
+                                        <div className="flex justify-between items-start mb-4">
                                             <div>
-                                                <p className="text-sm font-black text-white group-hover:text-emerald-400 transition-colors">{tx.buyer}</p>
-                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{tx.date}</p>
+                                                <p className="text-sm font-black text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{tx.buyer}</p>
+                                                <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mt-1.5">{tx.date}</p>
                                             </div>
-                                            <ExternalLink className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 transition-colors" />
+                                            <ExternalLink className="w-4 h-4 text-slate-700 group-hover:text-cyan-400 transition-colors" />
                                         </div>
                                         <div className="flex justify-between items-end">
                                             <div>
-                                                <p className="text-xs font-black text-slate-400">{Number(tx.credits).toLocaleString('en-IN')} tCO2e</p>
-                                                <p className="text-lg font-black premium-gradient-text mt-0.5">₹{Number(tx.amount).toLocaleString('en-IN')}</p>
+                                                <p className="text-[11px] font-black text-slate-500 mb-1">{Number(tx.credits).toLocaleString('en-IN')} tCO2e</p>
+                                                <p className="text-2xl font-black text-cyan-400 tracking-tight leading-none">₹{Number(tx.amount).toLocaleString('en-IN')}</p>
                                             </div>
-                                            <div className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border ${tx.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                            <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] border transition-all ${tx.status === 'Completed' || tx.status === 'Active'
+                                                ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10 group-hover:bg-emerald-500/10'
+                                                : 'bg-amber-500/5 text-amber-500 border-amber-500/10 group-hover:bg-amber-500/10'
                                                 }`}>
-                                                {tx.status}
+                                                {tx.status === 'Completed' || tx.status === 'Active' ? 'Completed' : tx.status}
                                             </div>
                                         </div>
                                     </div>

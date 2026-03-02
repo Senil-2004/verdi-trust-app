@@ -74,6 +74,18 @@ pool.getConnection()
                 console.log("Initial notifications seeded.");
             }
 
+            const [txCount] = await conn.query('SELECT COUNT(*) as count FROM transactions');
+            if (txCount[0].count === 0) {
+                await conn.query(`
+                    INSERT INTO transactions (buyer_name, credits, amount, transaction_date, status) VALUES
+                    ('Microsoft Corp', 1200, 27000.00, NOW() - INTERVAL 2 HOUR, 'Completed'),
+                    ('Delta Airlines', 8500, 153000.00, NOW() - INTERVAL 5 HOUR, 'Processing'),
+                    ('Stripe Climate', 450, 10125.00, NOW() - INTERVAL 1 DAY, 'Completed'),
+                    ('BMW Group', 2200, 49500.00, NOW() - INTERVAL 1 DAY, 'Completed')
+                `);
+                console.log("Initial transactions seeded.");
+            }
+
             console.log("Database schema updated: columns verified.");
         } catch (schemaErr) {
             console.error("Schema update notice:", schemaErr.message);
@@ -178,6 +190,20 @@ app.get('/api/users', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM users ORDER BY joined_at DESC');
         res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/users/profile', async (req, res) => {
+    const { email } = req.query;
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (rows.length > 0) {
+            res.json(rows[0]);
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

@@ -125,11 +125,13 @@ export function LoginPage() {
                 });
 
                 localStorage.setItem('userName', formData.name);
+                localStorage.setItem('userEmail', formData.email);
                 console.log("Firebase Account & DB Entry Created");
             } else {
                 // Login Existing User
                 const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
                 localStorage.setItem('userName', formData.email.split('@')[0]);
+                localStorage.setItem('userEmail', formData.email);
                 console.log("Firebase Login Success");
             }
 
@@ -153,6 +155,7 @@ export function LoginPage() {
         try {
             const result = await signInWithPopup(auth, provider);
             localStorage.setItem('userName', result.user.displayName || result.user.email.split('@')[0]);
+            localStorage.setItem('userEmail', result.user.email);
 
             if (result.user.email === 'admin@verditrust.com') {
                 navigate('/admin');

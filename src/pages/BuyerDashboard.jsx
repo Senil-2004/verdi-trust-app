@@ -108,9 +108,9 @@ const BuyerDashboard = () => {
                 rating: "AAA",
                 img: item.cover_image
                     ? (item.cover_image.startsWith('http') ? item.cover_image : `http://localhost:3005/uploads/${item.cover_image}`)
-                    : (item.project_source.includes('Amazon') ? 'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?auto=format&fit=crop&w=1200&q=80' :
-                        item.project_source.includes('Wind') ? 'https://images.unsplash.com/photo-1466611653911-954ff21caaf0?auto=format&fit=crop&w=1200&q=80' :
-                            'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80'),
+                    : (item.project_source.includes('Amazon') ? 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80' :
+                        item.project_source.includes('Wind') ? 'https://images.unsplash.com/photo-1532601224476-15c79f2f7a51?auto=format&fit=crop&w=1200&q=80' :
+                            'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80'),
                 icon: item.type === 'Energy' ? Zap : Leaf,
                 description: `Certified ${item.type} carbon sequestration project. This institutional-grade asset represents verifiable climate impact with Tier-1 integrity.`,
                 vintage: item.vintage,
@@ -225,73 +225,73 @@ const BuyerDashboard = () => {
             )}
 
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-0 shadow-2xl max-w-4xl overflow-y-auto max-h-[90vh] scrollbar-hide">
-                    <div className="h-80 relative">
+                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-0 shadow-2xl max-w-4xl overflow-hidden max-h-[95vh]">
+                    <div className="h-64 relative">
                         <img src={selectedProject?.img} className="w-full h-full object-cover" alt="" />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#080c0a] via-[#080c0a]/40 to-transparent" />
-                        <div className="absolute bottom-10 left-20">
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.3em] bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">{selectedProject?.rating} Rating</span>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">{selectedProject?.origin} Origin</span>
+                        <div className="absolute bottom-6 left-12">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">{selectedProject?.rating} Rating</span>
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">{selectedProject?.origin} Origin</span>
                             </div>
-                            <h2 className="text-5xl font-black tracking-tight">{selectedProject?.title}</h2>
+                            <h2 className="text-4xl font-black tracking-tight">{selectedProject?.title}</h2>
                         </div>
                     </div>
-                    <div className="px-20 py-12 grid grid-cols-1 md:grid-cols-12 gap-12">
-                        <div className="md:col-span-7 space-y-8">
+                    <div className="px-12 py-8 grid grid-cols-1 md:grid-cols-12 gap-8">
+                        <div className="md:col-span-7 space-y-6">
                             <div>
-                                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-6">Asset Intelligence</h4>
-                                <p className="text-slate-300 text-lg leading-relaxed font-medium">{selectedProject?.description}</p>
+                                <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">Asset Intelligence</h4>
+                                <p className="text-slate-300 text-base leading-relaxed font-medium line-clamp-3">{selectedProject?.description}</p>
                             </div>
-                            <div className="grid grid-cols-2 gap-8 pt-8 border-t border-white/5">
-                                <div className="space-y-4">
-                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2"><Calendar className="w-3.5 h-3.5" /> Vintage</p>
-                                    <p className="text-sm font-black text-slate-300">{selectedProject?.vintage}</p>
+                            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-white/5">
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2"><Calendar className="w-3 h-3" /> Vintage</p>
+                                    <p className="text-xs font-black text-slate-300">{selectedProject?.vintage}</p>
                                 </div>
-                                <div className="space-y-4">
-                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> Standard</p>
-                                    <p className="text-sm font-black text-slate-300">{selectedProject?.standard}</p>
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2"><ShieldCheck className="w-3 h-3" /> Standard</p>
+                                    <p className="text-xs font-black text-slate-300">{selectedProject?.standard}</p>
                                 </div>
                             </div>
                             {selectedProject?.certificate_file && (
-                                <div className="pt-8 block">
-                                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">Verification Artifacts</h4>
+                                <div className="pt-6 border-t border-white/5">
+                                    <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-3">Verification Artifacts</h4>
                                     <a
                                         href={`http://localhost:3005/uploads/${selectedProject.certificate_file}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         download
-                                        className="flex items-center gap-4 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all w-fit group"
+                                        className="flex items-center gap-4 px-5 py-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all w-full group"
                                     >
                                         <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
-                                            <FileText className="w-5 h-5" />
+                                            <FileText className="w-4 h-4" />
                                         </div>
-                                        <div>
-                                            <p className="text-xs font-black text-white uppercase tracking-widest">Protocol Certificate</p>
-                                            <p className="text-[10px] text-slate-500 font-bold mt-0.5">{selectedProject.certificate_file}</p>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-black text-white uppercase tracking-widest truncate">Protocol Certificate</p>
+                                            <p className="text-[9px] text-slate-500 font-bold mt-0.5 truncate">{selectedProject.certificate_file}</p>
                                         </div>
-                                        <Download className="w-4 h-4 ml-4 text-slate-600 group-hover:text-emerald-400 transition-colors" />
+                                        <Download className="w-3.5 h-3.5 text-slate-600 group-hover:text-emerald-400 transition-colors" />
                                     </a>
                                 </div>
                             )}
                         </div>
-                        <div className="md:col-span-5 glass-morphism rounded-3xl p-8 border-white/5 flex flex-col justify-between">
+                        <div className="md:col-span-5 glass-morphism rounded-3xl p-6 border-white/5 flex flex-col justify-between bg-white/[0.02]">
                             <div className="space-y-6">
                                 <div>
-                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">Available Liquidity</p>
-                                    <p className="text-3xl font-black text-white">{Number(selectedProject?.volume?.replace(/[^0-9]/g, '') || 0).toLocaleString('en-IN')} tCO2e</p>
+                                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-2">Available Liquidity</p>
+                                    <p className="text-2xl font-black text-white">{Number(selectedProject?.volume?.replace(/[^0-9]/g, '') || 0).toLocaleString('en-IN')} tCO2e</p>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4">Institutional Price</p>
-                                    <p className="text-5xl font-black text-emerald-400 tracking-tighter flex items-baseline gap-2">
+                                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-2">Institutional Price</p>
+                                    <p className="text-4xl font-black text-emerald-400 tracking-tighter flex items-baseline gap-1">
                                         {selectedProject?.price?.split('/')[0]}
-                                        <span className="text-sm font-black text-slate-600 whitespace-nowrap">/ tCO2e</span>
+                                        <span className="text-xs font-black text-slate-600 whitespace-nowrap">/ tCO2e</span>
                                     </p>
                                 </div>
                             </div>
                             <Button
                                 onClick={() => { setIsDetailsOpen(false); setIsPurchaseOpen(true); }}
-                                className="h-16 w-full bg-white text-[#080c0a] font-black text-sm uppercase tracking-[0.2em] rounded-2xl hover:bg-emerald-500 transition-all mt-8"
+                                className="h-14 w-full bg-white text-[#080c0a] font-black text-[11px] uppercase tracking-[0.2em] rounded-full hover:bg-emerald-500 transition-all mt-6 shadow-xl shadow-emerald-500/10"
                             >
                                 Initialize Purchase
                             </Button>
@@ -430,7 +430,7 @@ const BuyerDashboard = () => {
                                 className={`group glass-morphism border-none rounded-[3rem] overflow-hidden hover:scale-[1.02] transition-all duration-700 hover:shadow-2xl hover:shadow-emerald-900/10 opacity-0 animate-reveal-up delay-${(i + 1) * 200} cursor-pointer`}
                             >
                                 <div className="h-60 relative overflow-hidden">
-                                    <img src={project.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 opacity-60 group-hover:opacity-100" alt="" />
+                                    <img src={project.img} onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80'; }} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 opacity-60 group-hover:opacity-100" alt="" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-[#080c0a] via-transparent to-transparent" />
                                     <div className="absolute top-6 right-6">
                                         <div className="glass-morphism-heavy px-4 py-2 rounded-xl text-[9px] font-black tracking-widest text-emerald-400 border border-emerald-500/20 uppercase">{project.rating}</div>

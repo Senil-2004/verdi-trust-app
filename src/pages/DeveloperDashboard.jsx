@@ -16,7 +16,8 @@ import {
     MapPin,
     FileText,
     ExternalLink,
-    Download
+    Download,
+    Globe
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
@@ -52,6 +53,7 @@ const DeveloperDashboard = () => {
     const [newProject, setNewProject] = useState({ name: '', location: '', type: 'Reforestation' });
     const [actionStatus, setActionStatus] = useState({ type: '', id: null, active: false });
     const [reviewListings, setReviewListings] = useState([]);
+    const [issuanceHistory, setIssuanceHistory] = useState([]);
 
     const handleDownloadCSV = (data, fileName) => {
         const headers = ["ID", "Project Source", "Type", "Price", "Volume", "Vintage", "Status", "Certificate URL"];
@@ -116,8 +118,9 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                 }));
                 setProjects(mappedProjects);
 
-                // Extract listings that need verification
+                // Extract listings for the registry
                 setReviewListings(data.filter(l => l.status === 'In Review'));
+                setIssuanceHistory(data);
             } else {
                 console.error("API returned non-array:", data);
             }
@@ -181,22 +184,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                 </div>
             )}
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 relative">
-                <div className="absolute top-[-20px] left-[-20px] w-24 h-24 bg-teal-500/10 rounded-full blur-[60px] -z-10" />
-                <div>
-                    <div className="flex items-center gap-3 mb-4">
-                        <span className="glass-morphism text-teal-400 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-teal-500/20">Asset Issuance</span>
-                        <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-                        <span className="text-[10px] text-teal-600 font-bold uppercase tracking-widest">Global Protocol V.4.2</span>
-                    </div>
-                    <h1 className="text-6xl font-black text-white tracking-tight leading-[1.1]">
-                        Issuance <span className="premium-gradient-text text-teal-400">Command.</span>
-                    </h1>
-                    <p className="text-slate-400 mt-4 font-medium text-lg max-w-xl">Architecting high-fidelity environmental assets and managing global credit lifecycles.</p>
-                </div>
 
-
-            </div>
 
             <div id="portfolio" className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <StatCard title="Active Protocols" value={projects.filter(p => p.status === 'Verified').length} change="" icon={LayoutDashboard} trend="up" />
@@ -214,10 +202,10 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card id="marketplace" className="lg:col-span-2 border-none glass-morphism overflow-hidden rounded-[2.5rem]">
-                    <CardHeader className="border-b border-white/5 pb-8 px-10 pt-10 flex flex-row items-center justify-between">
+                    <CardHeader className="border-b border-white/5 pb-6 px-8 pt-8 flex flex-row items-center justify-between">
                         <div>
                             <CardTitle className="text-2xl font-black text-white">Project Activity</CardTitle>
-                            <CardDescription className="text-slate-500 font-medium font-medium">Real-time status of your environmental asset issuance</CardDescription>
+                            <CardDescription className="text-slate-500 font-medium text-xs mt-1">Real-time status of environmental asset issuance</CardDescription>
                         </div>
                         <Button
                             variant="ghost"
@@ -229,18 +217,18 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Export CSV</span>
                         </Button>
                     </CardHeader>
-                    <CardContent className="px-10 py-10">
-                        <div className="space-y-8">
-                            {projects.map((item, i) => (
-                                <div key={i} className="flex items-center justify-between group cursor-default">
+                    <CardContent className="px-8 py-8">
+                        <div className="space-y-6">
+                            {projects.length > 0 ? projects.map((item, i) => (
+                                <div key={i} className="flex items-center justify-between group cursor-default pb-4 border-b border-white/[0.02] last:border-0">
                                     <div className="flex items-center gap-5">
-                                        <div className={`p-4 rounded-2xl ${item.bg} border ${item.border} group-hover:scale-110 transition-transform duration-500`}>
-                                            <ShieldCheck className={`w-6 h-6 ${item.color}`} />
+                                        <div className={`p-3.5 rounded-2xl ${item.bg} border ${item.border} group-hover:scale-110 transition-transform duration-500`}>
+                                            <ShieldCheck className={`w-5 h-5 ${item.color}`} />
                                         </div>
                                         <div>
-                                            <p className="font-black text-white group-hover:text-teal-400 transition-colors uppercase tracking-tight text-base">{item.name}</p>
-                                            <div className="flex items-center gap-3 mt-1.5">
-                                                <Clock className="w-3.5 h-3.5 text-slate-600" />
+                                            <p className="font-black text-white group-hover:text-teal-400 transition-colors uppercase tracking-tight text-sm">{item.name}</p>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <Clock className="w-3 h-3 text-slate-600" />
                                                 <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{item.date}</p>
                                             </div>
                                         </div>
@@ -248,116 +236,196 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                     <div className="flex items-center gap-6">
                                         <div className="text-right">
                                             <div className="flex flex-col items-end">
-                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${item.border} ${item.bg} ${item.color}`}>
+                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${item.border} ${item.bg} ${item.color}`}>
                                                     <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
                                                     {item.status}
                                                 </div>
                                                 {item.status === 'Verified' && (
-                                                    <p className="text-xs font-black text-slate-500 mt-2">{item.credits} <span className="text-[10px] opacity-50 ml-1">tCO2e</span></p>
+                                                    <p className="text-[10px] font-black text-slate-500 mt-2">{item.credits} <span className="text-[9px] opacity-50 ml-0.5">tCO2e</span></p>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-center py-10">
+                                    <p className="text-xs font-black text-slate-600 uppercase tracking-[0.2em]">Initializing system activity...</p>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Verification Queue Redesign */}
-                <Card id="analytics" className="lg:col-span-full border-none glass-morphism overflow-hidden rounded-[2.5rem]">
-                    <CardHeader className="bg-slate-900/50 border-b border-white/5 p-12">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500">Market Verification Protocol</span>
-                                </div>
-                                <CardTitle className="text-4xl font-black text-white">Issuance Pipeline</CardTitle>
-                                <CardDescription className="text-slate-500 text-lg font-medium mt-2">Final validation of institutional carbon credit offerings</CardDescription>
+                <div className="lg:col-span-1 space-y-8">
+                    <Card className="border-none glass-morphism rounded-[2.5rem] overflow-hidden bg-teal-500/[0.02]">
+                        <CardHeader className="px-8 pt-8 pb-4">
+                            <CardTitle className="text-lg font-black text-white">Market Insights</CardTitle>
+                            <CardDescription className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Global Asset Trends</CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-8 pb-8 space-y-6">
+                            <div className="p-6 rounded-[2rem] bg-gradient-to-br from-teal-500/10 to-emerald-500/5 border border-teal-500/10">
+                                <p className="text-[10px] font-black text-teal-400 uppercase tracking-[0.2em] mb-3 text-center">Institutional Trust</p>
+                                <p className="text-4xl font-black text-white text-center tracking-tighter">99.9%</p>
+                                <p className="text-[10px] text-slate-600 font-black text-center mt-2 uppercase tracking-widest">Verification Accuracy</p>
                             </div>
-                            <div className="flex items-center gap-6">
-                                <div className="text-right glass-morphism px-8 py-6 rounded-3xl border border-white/10">
-                                    <p className="text-5xl font-black premium-gradient-text">{reviewListings.length}</p>
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2">Active Filings</p>
+
+                            <div className="space-y-5">
+                                <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                                            <Database className="w-4 h-4 text-blue-400" />
+                                        </div>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Nodes</span>
+                                    </div>
+                                    <span className="text-xs font-black text-white">1,240</span>
+                                </div>
+
+                                <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                                            <Clock className="w-4 h-4 text-amber-400" />
+                                        </div>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg. Review</span>
+                                    </div>
+                                    <span className="text-xs font-black text-white">4.2 Days</span>
+                                </div>
+
+                                <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                                            <Globe className="w-4 h-4 text-purple-400" />
+                                        </div>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Regions active</span>
+                                    </div>
+                                    <span className="text-xs font-black text-white">24 Units</span>
+                                </div>
+                            </div>
+
+                            <button className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-[0.2em] hover:bg-white/10 transition-all flex items-center justify-center gap-3">
+                                <FileText className="w-3.5 h-3.5" />
+                                View Protocol Docs
+                            </button>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none glass-morphism rounded-[2.5rem] p-8 bg-gradient-to-r from-emerald-600/10 to-teal-600/5 border border-emerald-500/20">
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="p-3 bg-emerald-500 rounded-2xl">
+                                <ShieldCheck className="w-5 h-5 text-black" />
+                            </div>
+                            <h4 className="text-sm font-black text-white uppercase tracking-widest">Secure Registry</h4>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                            Your environmental assets are processed through institutional-grade encryption protocols and multi-layered validation layers to ensure absolute climate integrity.
+                        </p>
+                    </Card>
+                </div>
+            </div>      {/* Verification Queue Redesign */}
+            <Card id="analytics" className="lg:col-span-full border-none glass-morphism overflow-hidden rounded-[2.5rem]">
+                <CardHeader className="bg-slate-900/50 border-b border-white/5 p-12">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500">Market Verification Protocol</span>
+                            </div>
+                            <CardTitle className="text-4xl font-black text-white">Issuance Registry</CardTitle>
+                            <CardDescription className="text-slate-500 text-lg font-medium mt-2">Comprehensive history and validation of environmental assets</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className="text-right glass-morphism px-8 py-6 rounded-3xl border border-white/10 flex items-center gap-8">
+                                <div>
+                                    <p className="text-sm font-black text-emerald-500 premium-gradient-text uppercase tracking-widest text-[10px] mb-1">Total Filings</p>
+                                    <p className="text-4xl font-black text-white">{issuanceHistory.length}</p>
+                                </div>
+                                <div className="w-px h-10 bg-white/10" />
+                                <div>
+                                    <p className="text-sm font-black text-amber-500 uppercase tracking-widest text-[10px] mb-1">Pending Review</p>
+                                    <p className="text-4xl font-black text-white">{reviewListings.length}</p>
                                 </div>
                             </div>
                         </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-white/5 text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
-                                        <th className="px-8 py-6 text-left">Filing Identifier</th>
-                                        <th className="px-8 py-6 text-left">Asset Source</th>
-                                        <th className="px-8 py-6 text-left">Pricing Models</th>
-                                        <th className="px-8 py-6 text-left">Legal Verification</th>
-                                        <th className="px-8 py-6 text-right">Issuance Authority</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {reviewListings.length > 0 ? reviewListings.map((l) => (
-                                        <tr key={l.id} className="hover:bg-white/[0.02] transition-colors group cursor-default">
-                                            <td className="px-8 py-6">
-                                                <span className="text-xs font-mono font-black text-slate-500 bg-white/5 px-2 py-1 rounded-md">#ASSET-{l.id}</span>
-                                            </td>
-                                            <td className="px-8 py-6">
-                                                <div className="flex items-center gap-5">
-                                                    <div className="relative w-16 h-12 rounded-xl border border-white/10 overflow-hidden bg-white/5 flex-shrink-0">
-                                                        {l.cover_image ? (
-                                                            <img src={`/uploads/${l.cover_image}`} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center">
-                                                                <MapPin className="w-4 h-4 text-slate-700" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-black text-white">{l.project_source}</p>
-                                                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1.5">{l.type}</p>
-                                                    </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-white/5 text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
+                                    <th className="px-8 py-6 text-left">Filing Identifier</th>
+                                    <th className="px-8 py-6 text-left">Asset Source</th>
+                                    <th className="px-8 py-6 text-left">Pricing Models</th>
+                                    <th className="px-8 py-6 text-left">Legal Verification</th>
+                                    <th className="px-8 py-6 text-right">Issuance Authority</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {issuanceHistory.length > 0 ? issuanceHistory.map((l) => (
+                                    <tr key={l.id} className="hover:bg-white/[0.02] transition-colors group cursor-default">
+                                        <td className="px-8 py-6">
+                                            <span className="text-xs font-mono font-black text-slate-500 bg-white/5 px-2 py-1 rounded-md">#ASSET-{l.id}</span>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-5">
+                                                <div className="relative w-16 h-12 rounded-xl border border-white/10 overflow-hidden bg-white/5 flex-shrink-0">
+                                                    {l.cover_image ? (
+                                                        <img
+                                                            src={l.cover_image?.startsWith('http') ? l.cover_image : `http://localhost:3005/uploads/${l.cover_image}`}
+                                                            onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80'; }}
+                                                            alt=""
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <MapPin className="w-4 h-4 text-slate-700" />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </td>
-                                            <td className="px-8 py-6">
-                                                <div className="flex flex-col gap-2">
-                                                    <p className="text-sm font-black text-white">₹{(Number(l.price) || 0).toLocaleString('en-IN')} <span className="text-[10px] text-slate-600 uppercase">/ Ton</span></p>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-black text-slate-500 uppercase">{(Number(l.volume) || 0).toLocaleString('en-IN')} issuing</span>
-                                                        <div className="w-1 h-1 rounded-full bg-slate-700" />
-                                                        <span className="text-[10px] font-black text-slate-500 uppercase">{l.vintage} Vintage</span>
-                                                    </div>
+                                                <div>
+                                                    <p className="text-sm font-black text-white">{l.project_source}</p>
+                                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1.5">{l.type}</p>
                                                 </div>
-                                            </td>
-                                            <td className="px-8 py-6">
-                                                {l.certificate_file ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <a
-                                                            href={`/uploads/${l.certificate_file}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            download
-                                                            className="flex items-center gap-3 px-4 py-2 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 rounded-xl w-fit group/file transition-all cursor-pointer"
-                                                        >
-                                                            <FileText className="w-4 h-4 text-emerald-400" />
-                                                            <span className="text-[10px] font-black text-slate-400 group-hover/file:text-emerald-400 transition-colors uppercase tracking-widest">{l.certificate_file}</span>
-                                                            <ExternalLink className="w-3 h-3 text-slate-600 group-hover/file:text-emerald-400 opacity-0 group-hover/file:opacity-100 transition-all" />
-                                                        </a>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-10 w-10 p-0 rounded-xl bg-white/5 border border-white/10 hover:bg-emerald-500/10 hover:text-emerald-400 text-slate-500 transition-all"
-                                                            title="Download Project Details"
-                                                            onClick={() => handleDownloadSingle(l)}
-                                                        >
-                                                            <Download className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] italic">Awaiting Payload</span>
-                                                )}
-                                            </td>
-                                            <td className="px-8 py-6 text-right">
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex flex-col gap-2">
+                                                <p className="text-sm font-black text-white">₹{(Number(l.price) || 0).toLocaleString('en-IN')} <span className="text-[10px] text-slate-600 uppercase">/ Ton</span></p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black text-slate-500 uppercase">{(Number(l.volume) || 0).toLocaleString('en-IN')} issuing</span>
+                                                    <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                    <span className="text-[10px] font-black text-slate-500 uppercase">{l.vintage} Vintage</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            {l.certificate_file ? (
+                                                <div className="flex items-center gap-2">
+                                                    <a
+                                                        href={`/uploads/${l.certificate_file}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        download
+                                                        className="flex items-center gap-3 px-4 py-2 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 rounded-xl w-fit group/file transition-all cursor-pointer"
+                                                    >
+                                                        <FileText className="w-4 h-4 text-emerald-400" />
+                                                        <span className="text-[10px] font-black text-slate-400 group-hover/file:text-emerald-400 transition-colors uppercase tracking-widest">{l.certificate_file}</span>
+                                                        <ExternalLink className="w-3 h-3 text-slate-600 group-hover/file:text-emerald-400 opacity-0 group-hover/file:opacity-100 transition-all" />
+                                                    </a>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="h-10 w-10 p-0 rounded-xl bg-white/5 border border-white/10 hover:bg-emerald-500/10 hover:text-emerald-400 text-slate-500 transition-all flex items-center justify-center flex-shrink-0"
+                                                        title="Download Project Details"
+                                                        onClick={() => handleDownloadSingle(l)}
+                                                    >
+                                                        <Download className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] italic">Awaiting Payload</span>
+                                            )}
+                                        </td>
+                                        <td className="px-8 py-6 text-right">
+                                            {l.status === 'In Review' ? (
                                                 <div className="flex justify-end gap-3">
                                                     <Button
                                                         size="sm"
@@ -372,31 +440,38 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                                         className="h-11 px-8 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98]"
                                                         onClick={() => handleVerify(l.id, 'Active')}
                                                     >
-                                                        Authorize Issuance
+                                                        Authorize
                                                     </Button>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan="5" className="px-8 py-20 text-center">
-                                                <div className="flex flex-col items-center gap-4">
-                                                    <div className="p-4 bg-white/5 rounded-2xl text-slate-700">
-                                                        <CheckCircle2 className="w-8 h-8" />
+                                            ) : (
+                                                <div className="flex justify-end items-center gap-3">
+                                                    <div className={`px-4 py-2 rounded-xl border font-black text-[10px] uppercase tracking-widest flex items-center gap-2 ${l.status === 'Active' ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400' : 'bg-rose-500/5 border-rose-500/20 text-rose-400'}`}>
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${l.status === 'Active' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                                        {l.status === 'Active' ? 'Authorized' : l.status}
                                                     </div>
-                                                    <p className="text-sm font-black text-slate-600 uppercase tracking-[0.2em]">All filings processed. Registry synchronized.</p>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="5" className="px-8 py-20 text-center">
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="p-4 bg-white/5 rounded-2xl text-slate-700">
+                                                    <Clock className="w-8 h-8" />
+                                                </div>
+                                                <p className="text-sm font-black text-slate-600 uppercase tracking-[0.2em]">No registry entries found. Registry initialized.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
 
 
-            </div>
         </div>
     );
 };
