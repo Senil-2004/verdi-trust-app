@@ -191,13 +191,19 @@ const BuyerDashboard = () => {
     };
 
     const handleDownloadCSV = (data, fileName) => {
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString('en-IN');
+        const dayStr = dateObj.toLocaleDateString('en-IN', { weekday: 'long' });
         const headers = ["Project Name", "Origin", "Price", "Vintage", "Standard", "Volume", "Status", "Certificate URL"];
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + headers.join(",") + "\n"
-            + data.map(p => {
-                const certUrl = p.certificate_file ? `http://localhost:3005/uploads/${p.certificate_file}` : 'N/A';
-                return `"${p.title || p.name}","${p.origin || 'N/A'}",${String(p.price || '').replace(/[₹,]/g, '')},${p.vintage || 'N/A'},"${p.standard || 'N/A'}","${p.volume || 'N/A'}","${p.status}","${certUrl}"`;
-            }).join("\n");
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += '"VerdiTrust Institutional Carbon Credit Marketplace"\n';
+        csvContent += `"Date","${dateStr}"\n`;
+        csvContent += `"Day","${dayStr}"\n\n`;
+        csvContent += headers.join(",") + "\n";
+        csvContent += data.map(p => {
+            const certUrl = p.certificate_file ? `http://localhost:3005/uploads/${p.certificate_file}` : 'N/A';
+            return `"${p.title || p.name}","${p.origin || 'N/A'}",${String(p.price || '').replace(/[₹,]/g, '')},${p.vintage || 'N/A'},"${p.standard || 'N/A'}","${p.volume || 'N/A'}","${p.status}","${certUrl}"`;
+        }).join("\n");
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);

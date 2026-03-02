@@ -56,15 +56,21 @@ const DeveloperDashboard = () => {
     const [issuanceHistory, setIssuanceHistory] = useState([]);
 
     const handleDownloadCSV = (data, fileName) => {
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString('en-IN');
+        const dayStr = dateObj.toLocaleDateString('en-IN', { weekday: 'long' });
         const headers = ["ID", "Project Source", "Type", "Price", "Volume", "Vintage", "Status", "Certificate URL"];
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + headers.join(",") + "\n"
-            + data.map(l => {
-                const price = String(l.price || '').replace(/,/g, '');
-                const volume = String(l.volume || '').replace(/,/g, '');
-                const certUrl = l.certificate_file ? `http://localhost:3005/uploads/${l.certificate_file}` : 'N/A';
-                return `${l.id},"${l.project_source || l.name}","${l.type || 'N/A'}",${price},${volume},${l.vintage || 'N/A'},"${l.status}","${certUrl}"`;
-            }).join("\n");
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += '"VerdiTrust Institutional Carbon Credit Marketplace"\n';
+        csvContent += `"Date","${dateStr}"\n`;
+        csvContent += `"Day","${dayStr}"\n\n`;
+        csvContent += headers.join(",") + "\n";
+        csvContent += data.map(l => {
+            const price = String(l.price || '').replace(/,/g, '');
+            const volume = String(l.volume || '').replace(/,/g, '');
+            const certUrl = l.certificate_file ? `http://localhost:3005/uploads/${l.certificate_file}` : 'N/A';
+            return `${l.id},"${l.project_source || l.name}","${l.type || 'N/A'}",${price},${volume},${l.vintage || 'N/A'},"${l.status}","${certUrl}"`;
+        }).join("\n");
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -75,7 +81,19 @@ const DeveloperDashboard = () => {
     };
 
     const handleDownloadSingle = (l) => {
-        const content = `Asset Identifier: #ASSET-${l.id}
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString('en-IN');
+        const dayStr = dateObj.toLocaleDateString('en-IN', { weekday: 'long' });
+
+        const content = `================================================
+  [VerdiTrust Logo] VERDITRUST
+  Institutional Carbon Credit Marketplace
+
+  Date: ${dateStr}
+  Day:  ${dayStr}
+================================================
+
+Asset Identifier: #ASSET-${l.id}
 Source: ${l.project_source}
 Type: ${l.type}
 Price: ₹${l.price}/Ton
