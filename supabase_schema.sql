@@ -80,3 +80,16 @@ INSERT INTO notifications (title, message, created_at) VALUES
 ('Carbon credit settlement cleared', 'Transaction #1234 has been processed successfully.', NOW() - INTERVAL '5 hours'),
 ('Market analysis report available', 'The monthly market report for January is now available.', NOW() - INTERVAL '1 day'),
 ('Welcome to VerdiTrust', 'Thank you for joining our platform.', NOW() - INTERVAL '2 days');
+
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT PRIMARY KEY DEFAULT 1,
+    platform_fee DECIMAL(10, 2) DEFAULT 2.5,
+    verification_timeout INT DEFAULT 48,
+    maintenance_mode BOOLEAN DEFAULT FALSE,
+    two_factor_required BOOLEAN DEFAULT TRUE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO system_settings (id, platform_fee, verification_timeout, maintenance_mode, two_factor_required)
+VALUES (1, 2.5, 48, FALSE, TRUE)
+ON CONFLICT (id) DO NOTHING;

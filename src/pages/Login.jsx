@@ -125,99 +125,66 @@ export function LoginPage() {
 
         try {
             if (isSignUp) {
-                // Create New Account
+                // SignUp logic - stays mostly sequential as we need UID 
                 const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
                 const user = userCredential.user;
 
-                // New users are always buyers
-                localStorage.removeItem('isSeller');
-
-                // Save to Firestore (fire and forget)
-                setDoc(doc(db, "users", user.uid), {
-                    name: formData.name,
-                    email: formData.email,
-                    role: 'buyer',
-                    createdAt: new Date().toISOString()
-                }).catch(err => console.warn("Firestore profile save failed (non-critical):", err));
-
-                // Save to Supabase — the source of truth for roles
-                await supabase.from('users').upsert([{
-                    name: formData.name,
-                    email: formData.email,
-                    role: 'Credit Buyer',
-                    status: 'Active'
-                }], { onConflict: 'email' });
-
-                await supabase.from('notifications').insert([{
-                    title: 'New User Registered',
-                    message: `${formData.name} joined as Credit Buyer.`
-                }]);
+                // Fire-and-forget profile creation
+                Promise.all([
+                    setDoc(doc(db, "users", user.uid), {
+                        name: formData.name, email: formData.email, role: 'buyer', createdAt: new Date().toISOString()
+                    }).catch(() => { }),
+                    supabase.from('users').upsert([{
+                        name: formData.name, email: formData.email, role: 'Credit Buyer', status: 'Active'
+                    }], { onConflict: 'email' }).catch(() => { }),
+                    supabase.from('notifications').insert([{
+                        title: 'New User Registered',
+                        message: `${formData.name} joined.`
+                    }]).catch(() => { })
+                ]);
 
                 localStorage.setItem('userName', formData.name);
                 localStorage.setItem('userEmail', formData.email);
-                console.log("Firebase Account Created + Supabase synced");
+                navigate('/buyer', { replace: true });
             } else {
-                // Login Existing User
-                const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-                const displayName = formData.email.split('@')[0];
-                localStorage.setItem('userName', displayName);
-                localStorage.setItem('userEmail', formData.email);
+                // Login optimization: Start Firebase Auth and Supabase fetch in parallel
+                const [authResult, profileResult] = await Promise.all([
+                    signInWithEmailAndPassword(auth, formData.email, formData.password),
+                    supabase.from('users').select('name, role').eq('email', formData.email).maybeSingle()
+                ]);
 
-                // Upsert into Supabase — sync any existing Firebase user who isn't in DB yet
-                // Only sets role/status if the row doesn't exist; existing rows keep their role.
-                const { data: existing } = await supabase
-                    .from('users')
-                    .select('id, role, name')
-                    .eq('email', formData.email)
-                    .maybeSingle();
+                const user = authResult.user;
+                let profile = profileResult.data;
 
-                if (!existing) {
-                    await supabase.from('users').insert([{
-                        name: displayName,
+                // Sync to Supabase if missing from DB but present in Firebase
+                if (!profile) {
+                    const fallbackName = formData.email.split('@')[0];
+                    const { data: newProfile } = await supabase.from('users').insert([{
+                        name: fallbackName,
                         email: formData.email,
                         role: 'Credit Buyer',
                         status: 'Active'
-                    }]);
-                } else if (existing.name) {
-                    localStorage.setItem('userName', existing.name);
+                    }]).select().single();
+                    profile = newProfile;
                 }
-                console.log("Firebase Login Success + Supabase synced");
-            }
 
-            // Navigation Logic
-            if (formData.email === 'admin@verditrust.com') {
-                navigate('/admin', { replace: true });
-            } else if (isSignUp) {
-                // New sign-ups always go to buyer dashboard
-                navigate('/buyer', { replace: true });
-            } else {
-                // Check exact role from Supabase for returning users
-                try {
-                    const { data, error } = await supabase.from('users').select('role').eq('email', formData.email).single();
+                localStorage.setItem('userName', profile?.name || user.email.split('@')[0]);
+                localStorage.setItem('userEmail', user.email);
 
-                    if (error || !data) {
-                        try {
-                            if (auth.currentUser) {
-                                await deleteUser(auth.currentUser);
-                            }
-                        } catch (delErr) {
-                            console.error("Failed to self-destruct Firebase auth:", delErr);
-                        }
-                        setError("This account has been permanently deleted from the database. Please sign up again.");
-                        setIsLoading(false);
-                        return;
-                    }
+                // Admin override
+                if (user.email === 'admin@verditrust.com') {
+                    navigate('/admin', { replace: true });
+                    return;
+                }
 
-                    if (data?.role === 'Project Developer' || data?.role === 'seller' || localStorage.getItem('isSeller') === 'true') {
-                        localStorage.setItem('isSeller', 'true');
-                        navigate('/seller', { replace: true });
-                    } else {
-                        localStorage.removeItem('isSeller');
-                        navigate('/buyer', { replace: true });
-                    }
-                } catch (err) {
-                    const isSeller = localStorage.getItem('isSeller') === 'true';
-                    navigate(isSeller ? '/seller' : '/buyer', { replace: true });
+                // Redirect based on role
+                const isSeller = profile?.role === 'Project Developer' || profile?.role === 'seller' || localStorage.getItem('isSeller') === 'true';
+                if (isSeller) {
+                    localStorage.setItem('isSeller', 'true');
+                    navigate('/seller', { replace: true });
+                } else {
+                    localStorage.removeItem('isSeller');
+                    navigate('/buyer', { replace: true });
                 }
             }
         } catch (error) {
@@ -245,66 +212,55 @@ export function LoginPage() {
         setGoogleLoading(true);
         setErrors({});
         try {
-            await setPersistence(auth, browserSessionPersistence);
-            const result = await signInWithPopup(auth, googleProvider);
+            // Parallelize persistence check and popup (mostly for UI smoothness)
+            const [result] = await Promise.all([
+                signInWithPopup(auth, googleProvider),
+                setPersistence(auth, browserSessionPersistence)
+            ]);
+
+            const email = result.user.email;
             const isNewUser = result._tokenResponse?.isNewUser || false;
 
-            localStorage.setItem('userName', result.user.displayName || result.user.email.split('@')[0]);
-            localStorage.setItem('userEmail', result.user.email);
+            // Immediately start profile fetch
+            const { data: profile } = await supabase
+                .from('users')
+                .select('name, role')
+                .eq('email', email)
+                .maybeSingle();
 
-            if (result.user.email === 'admin@verditrust.com') {
+            const displayName = profile?.name || result.user.displayName || email.split('@')[0];
+            localStorage.setItem('userName', displayName);
+            localStorage.setItem('userEmail', email);
+
+            if (email === 'admin@verditrust.com') {
                 navigate('/admin', { replace: true });
-            } else if (isNewUser) {
-                // New Google users are always buyers — save to Supabase
-                localStorage.removeItem('isSeller');
+                return;
+            }
 
-                const displayName = result.user.displayName || result.user.email.split('@')[0];
-                await supabase.from('users').upsert([{
+            if (isNewUser || !profile) {
+                // Background sync for new or missing users
+                supabase.from('users').upsert([{
                     name: displayName,
-                    email: result.user.email,
+                    email: email,
                     role: 'Credit Buyer',
                     status: 'Active'
-                }], { onConflict: 'email' });
+                }], { onConflict: 'email' }).then(() => {
+                    supabase.from('notifications').insert([{
+                        title: 'New User Registered',
+                        message: `${displayName} joined via Google.`
+                    }]);
+                });
+            }
 
-                await supabase.from('notifications').insert([{
-                    title: 'New User Registered',
-                    message: `${displayName} joined as Credit Buyer via Google.`
-                }]);
+            const role = profile?.role || 'Credit Buyer';
+            const isSeller = role === 'Project Developer' || role === 'seller' || localStorage.getItem('isSeller') === 'true';
 
-                navigate('/buyer', { replace: true });
+            if (isSeller) {
+                localStorage.setItem('isSeller', 'true');
+                navigate('/seller', { replace: true });
             } else {
-                try {
-                    // Sync returning Google user into Supabase if not present
-                    const { data: existingGUser } = await supabase
-                        .from('users')
-                        .select('id, role, name')
-                        .eq('email', result.user.email)
-                        .maybeSingle();
-
-                    if (!existingGUser) {
-                        const displayName = result.user.displayName || result.user.email.split('@')[0];
-                        await supabase.from('users').insert([{
-                            name: displayName,
-                            email: result.user.email,
-                            role: 'Credit Buyer',
-                            status: 'Active'
-                        }]);
-                    } else if (existingGUser.name) {
-                        localStorage.setItem('userName', existingGUser.name);
-                    }
-
-                    const roleData = existingGUser || { role: 'Credit Buyer' };
-                    if (roleData.role === 'Project Developer' || roleData.role === 'seller' || localStorage.getItem('isSeller') === 'true') {
-                        localStorage.setItem('isSeller', 'true');
-                        navigate('/seller', { replace: true });
-                    } else {
-                        localStorage.removeItem('isSeller');
-                        navigate('/buyer', { replace: true });
-                    }
-                } catch (err) {
-                    const isSeller = localStorage.getItem('isSeller') === 'true';
-                    navigate(isSeller ? '/seller' : '/buyer', { replace: true });
-                }
+                localStorage.removeItem('isSeller');
+                navigate('/buyer', { replace: true });
             }
         } catch (error) {
             console.error("Firebase Google Login Failed:", error);
@@ -329,7 +285,7 @@ export function LoginPage() {
             <div className="hidden md:flex md:w-[55%] relative group overflow-hidden">
                 <div
                     className="absolute inset-0 bg-cover bg-center transition-transform duration-[10000ms] ease-linear group-hover:scale-110"
-                    style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop")' }}
+                    style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1920&auto=format&fit=crop")' }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#080c0a] via-[#080c0a]/40 to-transparent" />
                 <div className="absolute inset-0 bg-emerald-900/10 mix-blend-overlay" />

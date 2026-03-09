@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { Leaf, LogOut, Bell, User, Mail, Shield, Calendar, MapPin, Building2, Globe } from 'lucide-react';
+import { Leaf, LogOut, Bell, User, Mail, Shield, Calendar, MapPin, Building2, Globe, Menu, X, LayoutDashboard } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { CardDescription } from '../components/ui/card';
@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 const DashboardLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const handleLogout = async () => {
         try {
@@ -149,34 +150,42 @@ const DashboardLayout = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#080c0a] text-slate-200 flex flex-col font-['Outfit']">
+        <div className="min-h-screen bg-[#080c0a] text-slate-200 flex flex-col font-['Outfit'] overflow-x-hidden">
             {/* Top Navigation */}
-            <header className="h-16 glass-morphism sticky top-0 z-50 flex items-center justify-between px-6 border-b border-white/5">
-                <Link to="/" className="flex items-center gap-3 group">
-                    <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 rounded-2xl shadow-lg shadow-emerald-500/10 group-hover:scale-110 transition-transform">
-                        <Leaf className="w-6 h-6 text-[#080c0a]" />
-                    </div>
-                    <span className="text-2xl font-black text-white tracking-tight">VerdiTrust</span>
-                </Link>
+            <header className="h-16 glass-morphism sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 border-b border-white/5">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="p-2 sm:hidden text-slate-400 hover:text-white transition-colors"
+                    >
+                        {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                    </button>
+                    <Link to="/" className="flex items-center gap-2 sm:gap-3 group">
+                        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/10 group-hover:scale-110 transition-transform">
+                            <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-[#080c0a]" />
+                        </div>
+                        <span className="text-lg sm:text-2xl font-black text-white tracking-tight">VerdiTrust</span>
+                    </Link>
+                </div>
 
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2 sm:gap-6">
 
 
                     <div className="flex items-center gap-5">
                         <div className="relative" ref={notificationRef}>
                             <button
                                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-slate-400 hover:text-emerald-400 hover:bg-white/10 transition-all relative"
+                                className="p-2 sm:p-2.5 rounded-xl bg-white/5 border border-white/5 text-slate-400 hover:text-emerald-400 hover:bg-white/10 transition-all relative"
                             >
                                 <Bell className="w-5 h-5" />
                                 {notifications.some(n => !n.read) && (
-                                    <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-emerald-500 rounded-full border-2 border-[#080c0a]"></span>
+                                    <span className="absolute top-2 sm:top-2.5 right-2 sm:right-2.5 w-2 h-2 bg-emerald-500 rounded-full border-2 border-[#080c0a]"></span>
                                 )}
                             </button>
 
                             {isNotificationsOpen && (
-                                <div className="absolute right-0 mt-4 w-80 glass-morphism-heavy rounded-[1.5rem] border border-white/10 shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-right">
-                                    <div className="p-5 border-b border-white/5 flex justify-between items-center">
+                                <div className="absolute right-[-60px] sm:right-0 mt-4 w-[280px] sm:w-80 glass-morphism-heavy rounded-[1.5rem] border border-white/10 shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-right">
+                                    <div className="p-4 sm:p-5 border-b border-white/5 flex justify-between items-center">
                                         <h3 className="font-black text-white text-sm">Notifications</h3>
                                         <button onClick={markAllAsRead} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider">
                                             Mark all read
@@ -228,7 +237,7 @@ const DashboardLayout = () => {
                         <div className="h-10 w-[1px] bg-white/10 mx-2"></div>
 
                         <div
-                            className="flex items-center gap-4 pl-2 cursor-pointer group hover:bg-white/5 p-1 rounded-2xl transition-all"
+                            className="flex items-center gap-2 sm:gap-4 pl-1 sm:pl-2 cursor-pointer group hover:bg-white/5 p-1 rounded-2xl transition-all"
                             onClick={() => setIsProfileOpen(true)}
                         >
                             <div className="text-right hidden sm:block">
@@ -242,7 +251,7 @@ const DashboardLayout = () => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black text-lg shadow-inner group-hover:scale-110 transition-transform">
+                            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black text-base sm:text-lg shadow-inner group-hover:scale-110 transition-transform">
                                 {(userProfile?.name || localStorage.getItem('userName') || 'Gregory')[0].toUpperCase()}
                             </div>
                         </div>
@@ -305,13 +314,54 @@ const DashboardLayout = () => {
                             variant="ghost"
                             size="sm"
                             onClick={handleLogout}
-                            className="ml-4 p-2.5 rounded-xl bg-white/5 border border-white/5 text-slate-400 hover:text-rose-400 hover:bg-rose-400/10 transition-all"
+                            className="hidden sm:flex p-2.5 rounded-xl bg-white/5 border border-white/5 text-slate-400 hover:text-rose-400 hover:bg-rose-400/10 transition-all"
                         >
                             <LogOut className="w-5 h-5" />
                         </Button>
                     </div>
                 </div>
             </header>
+
+            {/* Mobile Sidebar Overlay */}
+            {isMobileMenuOpen && (
+                <div className="fixed inset-0 z-[60] sm:hidden">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+                    <div className="absolute left-0 top-0 bottom-0 w-[280px] bg-[#080c0a] border-r border-white/5 p-6 animate-in slide-in-from-left duration-300">
+                        <div className="flex items-center gap-3 mb-10 pb-6 border-b border-white/5">
+                            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-2 rounded-xl">
+                                <Leaf className="w-5 h-5 text-[#080c0a]" />
+                            </div>
+                            <span className="text-xl font-black text-white tracking-tight">VerdiTrust</span>
+                        </div>
+
+                        <nav className="space-y-4">
+                            <Link
+                                to="/"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 text-white font-bold"
+                            >
+                                <LayoutDashboard className="w-5 h-5 text-emerald-500" />
+                                Explore Market
+                            </Link>
+                            {/* Role based links could go here */}
+                            <button
+                                onClick={() => { setIsMobileMenuOpen(false); setIsProfileOpen(true); }}
+                                className="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-white/5 text-slate-400"
+                            >
+                                <User className="w-5 h-5" />
+                                Profile Details
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-500/10 text-rose-500 mt-auto"
+                            >
+                                <LogOut className="w-5 h-5" />
+                                Terminate Session
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content Area */}
             <main className="flex-1">

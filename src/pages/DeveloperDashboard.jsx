@@ -28,22 +28,22 @@ const SUPABASE_STORAGE_URL = 'https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v
 
 const StatCard = ({ title, value, change, icon: Icon, trend }) => (
     <Card className="border-none glass-morphism hover:scale-[1.02] transition-all duration-500 cursor-default group overflow-hidden">
-        <CardContent className="p-8 relative">
-            <div className="absolute -right-4 -top-4 w-32 h-32 text-teal-500 opacity-[0.03] rounded-full blur-3xl group-hover:opacity-10 transition-opacity" />
-            <div className="flex justify-between items-start mb-6">
-                <div className="p-4 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 group-hover:scale-110 transition-transform duration-500">
-                    <Icon className="w-6 h-6" />
+        <CardContent className="p-6 sm:p-8 relative">
+            <div className="absolute -right-4 -bottom-4 w-32 h-32 text-teal-500 opacity-[0.03] rounded-full blur-3xl group-hover:opacity-10 transition-opacity" />
+            <div className="flex justify-between items-start mb-4 sm:mb-6">
+                <div className="p-3 sm:p-4 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 group-hover:scale-110 transition-transform duration-500">
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <div className={`flex items-center gap-1 text-[10px] font-black px-3 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                    {trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                <div className={`flex items-center gap-1 text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                    {trend === 'up' ? <ArrowUpRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
                     {change}
                 </div>
             </div>
             <div>
-                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-2">{title}</p>
-                <div className="flex items-baseline gap-3">
-                    <h3 className="text-3xl font-black text-white tracking-tight">{value}</h3>
-                    {trend === 'up' && <TrendingUp className="w-5 h-5 text-emerald-500/50" />}
+                <p className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-1 sm:mb-2">{title}</p>
+                <div className="flex items-baseline gap-2 sm:gap-3">
+                    <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">{value}</h3>
+                    {trend === 'up' && <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500/50" />}
                 </div>
             </div>
         </CardContent>
@@ -196,13 +196,13 @@ Certificate: ${l.certificate_file || 'N/A'}`;
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-1000">
+        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 sm:space-y-12 animate-in fade-in duration-1000">
             {/* Action Toast */}
             {actionStatus.active && (
-                <div className="fixed bottom-12 right-12 z-50 animate-in slide-in-from-right-10">
-                    <div className="glass-morphism-heavy px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-emerald-500/20">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                        <span className="text-sm font-black text-white uppercase tracking-widest">{actionStatus.type} successful!</span>
+                <div className="fixed bottom-6 sm:bottom-12 right-6 sm:right-12 z-50 animate-in slide-in-from-right-10">
+                    <div className="glass-morphism-heavy px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-emerald-500/20">
+                        <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                        <span className="text-[10px] sm:text-sm font-black text-white uppercase tracking-widest">{actionStatus.type} successful!</span>
                     </div>
                 </div>
             )}
@@ -225,23 +225,23 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card id="marketplace" className="lg:col-span-2 border-none glass-morphism overflow-hidden rounded-[2.5rem]">
-                    <CardHeader className="border-b border-white/5 pb-6 px-8 pt-8 flex flex-row items-center justify-between">
+                    <CardHeader className="border-b border-white/5 pb-6 px-6 sm:px-8 pt-6 sm:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div>
-                            <CardTitle className="text-2xl font-black text-white">Project Activity</CardTitle>
-                            <CardDescription className="text-slate-500 font-medium text-xs mt-1">Real-time status of environmental asset issuance</CardDescription>
+                            <CardTitle className="text-xl sm:text-2xl font-black text-white">Project Activity</CardTitle>
+                            <CardDescription className="text-slate-500 font-medium text-[10px] sm:text-xs mt-1">Real-time status of environmental asset issuance</CardDescription>
                         </div>
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-10 px-4 rounded-xl border border-white/10 hover:bg-white/10 text-slate-400 gap-2"
+                            className="h-10 px-4 rounded-xl border border-white/10 hover:bg-white/10 text-slate-400 gap-2 w-full sm:w-auto mt-2 sm:mt-0"
                             onClick={() => handleDownloadCSV(projects, 'project-activity')}
                         >
                             <Download className="w-4 h-4" />
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Export CSV</span>
                         </Button>
                     </CardHeader>
-                    <CardContent className="px-8 py-8">
-                        <div className="space-y-6">
+                    <CardContent className="px-6 sm:px-8 py-6 sm:py-8 overflow-x-auto">
+                        <div className="space-y-6 min-w-[500px] sm:min-w-0">
                             {projects.length > 0 ? projects.map((item, i) => (
                                 <div key={i} className="flex items-center justify-between group cursor-default pb-4 border-b border-white/[0.02] last:border-0">
                                     <div className="flex items-center gap-5">
@@ -343,35 +343,36 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                         </p>
                     </Card>
                 </div>
-            </div>      {/* Verification Queue Redesign */}
+            </div>
+            {/* Verification Queue Redesign */}
             <Card id="analytics" className="lg:col-span-full border-none glass-morphism overflow-hidden rounded-[2.5rem]">
-                <CardHeader className="bg-slate-900/50 border-b border-white/5 p-12">
-                    <div className="flex justify-between items-center">
+                <CardHeader className="bg-slate-900/50 border-b border-white/5 p-6 sm:p-12">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
                         <div>
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
                                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500">Market Verification Protocol</span>
                             </div>
-                            <CardTitle className="text-4xl font-black text-white">Issuance Registry</CardTitle>
-                            <CardDescription className="text-slate-500 text-lg font-medium mt-2">Comprehensive history and validation of environmental assets</CardDescription>
+                            <CardTitle className="text-3xl sm:text-4xl font-black text-white">Issuance Registry</CardTitle>
+                            <CardDescription className="text-slate-500 text-base sm:text-lg font-medium mt-2">Comprehensive history and validation of assets</CardDescription>
                         </div>
-                        <div className="flex items-center gap-6">
-                            <div className="text-right glass-morphism px-8 py-6 rounded-3xl border border-white/10 flex items-center gap-8">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full lg:w-auto">
+                            <div className="text-right glass-morphism px-6 sm:px-8 py-4 sm:py-6 rounded-3xl border border-white/10 flex items-center justify-between sm:justify-center gap-6 sm:gap-8 w-full">
                                 <div>
-                                    <p className="text-sm font-black text-emerald-500 premium-gradient-text uppercase tracking-widest text-[10px] mb-1">Total Filings</p>
-                                    <p className="text-4xl font-black text-white">{issuanceHistory.length}</p>
+                                    <p className="font-black text-emerald-500 premium-gradient-text uppercase tracking-widest text-[9px] sm:text-[10px] mb-1">Total Filings</p>
+                                    <p className="text-2xl sm:text-4xl font-black text-white">{issuanceHistory.length}</p>
                                 </div>
                                 <div className="w-px h-10 bg-white/10" />
                                 <div>
-                                    <p className="text-sm font-black text-amber-500 uppercase tracking-widest text-[10px] mb-1">Pending Review</p>
-                                    <p className="text-4xl font-black text-white">{reviewListings.length}</p>
+                                    <p className="font-black text-amber-500 uppercase tracking-widest text-[9px] sm:text-[10px] mb-1">Pending Review</p>
+                                    <p className="text-2xl sm:text-4xl font-black text-white">{reviewListings.length}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
+                <CardContent className="p-0 overflow-x-auto">
+                    <div className="w-full min-w-[900px]">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-white/5 text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
@@ -495,7 +496,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
             </Card>
 
 
-        </div>
+        </div >
     );
 };
 

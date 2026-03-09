@@ -10,7 +10,7 @@ import { Label } from '../components/ui/label';
 
 const PortfolioStat = ({ label, value, icon: Icon, color, trend }) => (
     <Card className="border-none glass-morphism hover:scale-[1.02] transition-all duration-500 cursor-default group overflow-hidden opacity-0 animate-reveal-up">
-        <CardContent className="p-10 relative">
+        <CardContent className="p-6 sm:p-10 relative">
             <div className={`absolute -right-4 -top-4 w-40 h-40 ${color} opacity-[0.03] rounded-full blur-[80px] group-hover:opacity-10 transition-opacity`} />
             <div className="flex justify-between items-start mb-8">
                 <div className={`p-4 rounded-2xl ${color} bg-opacity-10 border border-current transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.1)]`}>
@@ -24,10 +24,10 @@ const PortfolioStat = ({ label, value, icon: Icon, color, trend }) => (
                 </div>
             </div>
             <div>
-                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-3">{label}</p>
-                <div className="flex items-baseline gap-3">
-                    <h3 className="text-4xl font-black text-white tracking-tighter">{value}</h3>
-                    <TrendingUp className="w-5 h-5 text-emerald-500/50" />
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">{label}</p>
+                <div className="flex items-baseline gap-2 sm:gap-3">
+                    <h3 className="text-2xl sm:text-4xl font-black text-white tracking-tighter">{value}</h3>
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500/50" />
                 </div>
             </div>
         </CardContent>
@@ -229,7 +229,7 @@ const BuyerDashboard = () => {
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-1000">
+        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 sm:space-y-12 animate-in fade-in duration-1000">
             {/* Action Toast */}
             {actionStatus.active && (
                 <div className="fixed bottom-12 right-12 z-50 animate-in slide-in-from-right-10">
@@ -317,7 +317,7 @@ const BuyerDashboard = () => {
             </Dialog>
 
             <Dialog open={isPurchaseOpen} onOpenChange={setIsPurchaseOpen}>
-                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[2.5rem] p-8 shadow-2xl max-w-lg w-full overflow-y-auto max-h-[90vh] scrollbar-hide">
+                <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl max-w-lg w-[95vw] sm:w-full overflow-y-auto max-h-[90vh] scrollbar-hide">
                     {!isPaymentProcessing && !paymentSuccess ? (
                         <>
                             <DialogHeader>
@@ -410,10 +410,8 @@ const BuyerDashboard = () => {
                 </div>
             )}
 
-            <div className="space-y-12">
-
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+            <div className="space-y-8 sm:space-y-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-12">
                     {loading ? [1, 2, 3].map(i => <div key={i} className="h-[500px] glass-morphism rounded-[3rem] animate-pulse" />) :
                         projects.map((project, i) => (
                             <Card
@@ -428,16 +426,16 @@ const BuyerDashboard = () => {
                                         <div className="glass-morphism-heavy px-4 py-2 rounded-xl text-[9px] font-black tracking-widest text-emerald-400 border border-emerald-500/20 uppercase">{project.rating}</div>
                                     </div>
                                 </div>
-                                <CardContent className="p-8 space-y-6">
+                                <CardContent className="p-6 sm:p-8 space-y-4 sm:space-y-6">
                                     <div className="flex items-center gap-3">
                                         <span className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.2em]">{project.origin} Origin</span>
                                         <div className="w-1 h-1 rounded-full bg-slate-800" />
                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Tier-1 Asset</span>
                                     </div>
-                                    <h3 className="text-2xl font-black text-white leading-tight group-hover:text-emerald-400 transition-colors tracking-tight line-clamp-1">{project.title}</h3>
-                                    <div className="pt-6 border-t border-white/5 flex items-center justify-between">
-                                        <p className="text-base font-black text-white">{project.price?.split('/')[0]} <span className="text-[10px] text-slate-600 ml-1">/ ton</span></p>
-                                        <div className="p-2.5 bg-white/5 rounded-xl text-white/40 group-hover:bg-emerald-500 group-hover:text-[#080c0a] transition-all">
+                                    <h3 className="text-xl sm:text-2xl font-black text-white leading-tight group-hover:text-emerald-400 transition-colors tracking-tight line-clamp-2">{project.title}</h3>
+                                    <div className="pt-4 sm:pt-6 border-t border-white/5 flex items-center justify-between">
+                                        <p className="text-sm sm:text-base font-black text-white">{project.price?.split('/')[0]} <span className="text-[10px] text-slate-600 ml-1">/ ton</span></p>
+                                        <div className="p-2 sm:p-2.5 bg-white/5 rounded-xl text-white/40 group-hover:bg-emerald-500 group-hover:text-[#080c0a] transition-all">
                                             <ArrowUpRight className="w-4 h-4" />
                                         </div>
                                     </div>

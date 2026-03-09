@@ -41,20 +41,20 @@ const SUPABASE_STORAGE_URL = 'https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v
 
 const StatCard = ({ title, value, change, icon: Icon, trend, color }) => (
     <Card className="border-none glass-morphism hover:scale-[1.02] transition-all duration-500 cursor-default group overflow-hidden">
-        <CardContent className="p-8 relative">
-            <div className={`absolute -right-4 -top-4 w-32 h-32 ${color.replace('bg-', 'text-')} opacity-[0.03] rounded-full blur-3xl group-hover:opacity-10 transition-opacity`} />
-            <div className="flex justify-between items-start mb-6">
-                <div className={`p-4 rounded-2xl ${color} bg-opacity-10 border border-current text-current group-hover:scale-110 transition-transform duration-500`}>
-                    <Icon className="w-6 h-6" />
+        <CardContent className="p-6 sm:p-8 relative">
+            <div className={`absolute -right-4 -bottom-4 w-32 h-32 ${color.replace('bg-', 'text-')} opacity-[0.03] rounded-full blur-3xl group-hover:opacity-10 transition-opacity`} />
+            <div className="flex justify-between items-start mb-4 sm:mb-6">
+                <div className={`p-3 sm:p-4 rounded-2xl ${color} bg-opacity-10 border border-current text-current group-hover:scale-110 transition-transform duration-500`}>
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <div className={`flex items-center gap-1 text-[10px] font-black px-3 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                    {trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                <div className={`flex items-center gap-1 text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                    {trend === 'up' ? <ArrowUpRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <ArrowDownRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
                     {change}
                 </div>
             </div>
             <div>
-                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-2">{title}</p>
-                <h3 className="text-3xl font-black text-white tracking-tight">{value}</h3>
+                <p className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-1 sm:mb-2">{title}</p>
+                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">{value}</h3>
             </div>
         </CardContent>
     </Card>
@@ -659,14 +659,14 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
                     {/* Edit Listing Dialog */}
                     <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                        <DialogContent className="max-w-4xl glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-0 shadow-2xl overflow-y-auto max-h-[90vh] scrollbar-hide">
-                            <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 p-8 border-b border-white/10">
-                                <DialogTitle className="text-2xl font-black tracking-tight mb-1">Modify Asset Configuration</DialogTitle>
-                                <p className="text-slate-400 font-medium text-sm">Adjust performance and market parameters for CRT-{editingListing?.id}</p>
+                        <DialogContent className="max-w-4xl glass-morphism-heavy border-white/10 text-white rounded-[2rem] sm:rounded-[3rem] p-0 shadow-2xl overflow-y-auto max-h-[90vh] scrollbar-hide w-[95vw] sm:w-full">
+                            <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 p-6 sm:p-8 border-b border-white/10">
+                                <DialogTitle className="text-xl sm:text-2xl font-black tracking-tight mb-1">Modify Asset Configuration</DialogTitle>
+                                <p className="text-slate-400 font-medium text-xs sm:text-sm">Adjust parameters for CRT-{editingListing?.id}</p>
                             </div>
 
-                            <div className="p-8 grid grid-cols-1 md:grid-cols-12 gap-8">
-                                <div className="md:col-span-7 space-y-10">
+                            <div className="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8">
+                                <div className="md:col-span-7 space-y-8 sm:space-y-10">
                                     <div className="space-y-6">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 bg-indigo-500/20 rounded-xl text-indigo-400">
@@ -801,16 +801,16 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                 </div>
                             </div>
 
-                            <div className="p-12 bg-white/5 border-t border-white/10 flex justify-end gap-6 rounded-b-[3rem]">
+                            <div className="p-6 sm:p-12 bg-white/5 border-t border-white/10 flex flex-col sm:flex-row justify-end gap-4 sm:gap-6 rounded-b-[2rem] sm:rounded-b-[3rem]">
                                 <Button
                                     variant="ghost"
-                                    className="h-16 px-10 rounded-2xl font-black text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-all"
+                                    className="h-14 sm:h-16 px-8 sm:px-10 rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-all w-full sm:w-auto"
                                     onClick={() => setIsEditOpen(false)}
                                 >
-                                    Cancel Changes
+                                    Cancel
                                 </Button>
                                 <Button
-                                    className="h-16 px-14 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-indigo-900/40 transition-all active:scale-[0.98]"
+                                    className="h-14 sm:h-16 px-10 sm:px-14 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] sm:text-xs uppercase tracking-[0.2em] shadow-2xl shadow-indigo-900/40 transition-all active:scale-[0.98] w-full sm:w-auto"
                                     onClick={handleUpdateListing}
                                 >
                                     Commit Updates
@@ -996,72 +996,67 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card id="marketplace" className="lg:col-span-2 border-none glass-morphism overflow-hidden rounded-[2.5rem]">
-                    <CardHeader className="border-b border-white/5 py-10 px-10 flex flex-row items-center justify-between gap-8">
+                    <CardHeader className="border-b border-white/5 py-6 sm:py-10 px-6 sm:px-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 sm:gap-8">
                         <div className="flex flex-col justify-center">
-                            <CardTitle className="text-2xl font-black text-white leading-none">Market Listings</CardTitle>
+                            <CardTitle className="text-xl sm:text-2xl font-black text-white leading-none">Market Listings</CardTitle>
                             <CardDescription className="text-slate-500 font-medium mt-2 leading-tight">Your active carbon credit offers on the exchange</CardDescription>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 gap-3"
+                                className="h-10 sm:h-12 px-4 sm:px-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 gap-3 flex-1 sm:flex-none"
                                 onClick={() => handleDownloadCSV(filteredListings, 'market-listings')}
                             >
-                                <Download className="w-5 h-5 text-emerald-400" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Export {statusFilter === 'All' ? 'All' : statusFilter}</span>
+                                <Download className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Export</span>
                             </Button>
-                            <div className="relative">
+                            <div className="relative flex-1 sm:flex-none sm:w-56">
                                 <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                                 <input
-                                    className="h-12 pl-10 pr-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white w-56 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600 flex items-center"
-                                    placeholder="Search listings..."
+                                    className="h-10 sm:h-12 w-full pl-10 pr-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600 flex items-center"
+                                    placeholder="Search..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
-                                {searchQuery && (
-                                    <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400 transition-colors">
-                                        &times;
-                                    </button>
-                                )}
                             </div>
-                            <Button variant="ghost" size="sm" onClick={fetchData} className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 mr-2 hover:text-emerald-400 transition-colors" title="Refresh Data">
-                                <RefreshCw className="w-5 h-5" />
+                            <Button variant="ghost" size="sm" onClick={fetchData} className="h-10 sm:h-12 w-10 sm:w-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors" title="Refresh Data">
+                                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={handleFilterCycle}
-                                className={`h-12 px-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${statusFilter !== 'All' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'}`}
+                                className={`h-10 sm:h-12 px-3 sm:px-4 rounded-2xl border transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none ${statusFilter !== 'All' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'}`}
                                 title={`Filter: ${statusFilter}`}
                             >
-                                <Filter className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{statusFilter}</span>
+                                <Filter className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">{statusFilter}</span>
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-0">
+                    <CardContent className="p-0 overflow-x-auto">
                         {/* Pending Submissions Alert */}
                         {listings.some(l => l.status === 'In Review') && (
-                            <div className="mx-10 mt-8 p-6 bg-amber-500/5 border border-amber-500/10 rounded-3xl flex items-center justify-between group cursor-default">
+                            <div className="mx-6 sm:mx-10 mt-6 sm:mt-8 p-4 sm:p-6 bg-amber-500/5 border border-amber-500/10 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group cursor-default">
                                 <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-500 group-hover:scale-110 transition-transform">
-                                        <Clock className="w-6 h-6 animate-spin-slow" />
+                                    <div className="p-2 sm:p-3 bg-amber-500/10 rounded-2xl text-amber-500 group-hover:scale-110 transition-transform text-center">
+                                        <Clock className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-black text-amber-400 uppercase tracking-widest">
+                                        <p className="text-xs sm:text-sm font-black text-amber-400 uppercase tracking-widest">
                                             {listings.filter(l => l.status === 'In Review').length} Verification(s) Pending
                                         </p>
-                                        <p className="text-xs text-slate-500 font-medium mt-1">Institutional verification in progress by the Developer network.</p>
+                                        <p className="text-[10px] sm:text-xs text-slate-500 font-medium mt-1">Institutional verification in progress.</p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 glass-morphism px-4 py-2 rounded-full border border-amber-500/20 shadow-lg shadow-amber-500/10">In Protocol</span>
+                                <div className="w-full sm:w-auto text-left sm:text-right">
+                                    <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-amber-500 glass-morphism px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-amber-500/20 shadow-lg shadow-amber-500/10 whitespace-nowrap">In Protocol</span>
                                 </div>
                             </div>
                         )}
 
-                        <div className="mt-8">
+                        <div className="mt-6 sm:mt-8 w-full min-w-[800px]">
                             <table className="w-full text-left table-fixed">
                                 <thead>
                                     <tr className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] border-b border-white/5">
@@ -1321,7 +1316,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                 </Card>
 
                 <Card className="border-none glass-morphism rounded-[2.5rem] overflow-hidden">
-                    <CardHeader className="pb-6 px-8 pt-8 border-b border-white/5">
+                    <CardHeader className="pb-6 px-6 sm:px-8 pt-6 sm:px-8 border-b border-white/5">
                         <CardTitle className="text-xl font-black text-white">Settlements</CardTitle>
                         <CardDescription className="text-slate-500 font-medium">Verified customer procurement</CardDescription>
                     </CardHeader>
@@ -1347,7 +1342,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                                 <p className="text-base font-black text-cyan-400 tracking-tight leading-none">₹{Number(tx.amount).toLocaleString('en-IN')}</p>
                                                 <span className="text-[10px] font-bold text-slate-600">{Number(tx.credits).toLocaleString('en-IN')} tCO2e</span>
                                             </div>
-                                            <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${tx.status === 'Completed' || tx.status === 'Active'
+                                            <div className={`px-2 sm:px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${tx.status === 'Completed' || tx.status === 'Active'
                                                 ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10'
                                                 : 'bg-amber-500/5 text-amber-500 border-amber-500/10'
                                                 }`}>
@@ -1359,15 +1354,13 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                 ))
                             )}
                         </div>
-                        <Button variant="ghost" className="w-full rounded-none h-16 text-[10px] font-black uppercase tracking-widest text-slate-500 border-t border-white/5 hover:bg-white/5 hover:text-white transition-all" onClick={() => runAction('Open secure ledger')}>
+                        <Button variant="ghost" className="w-full rounded-none h-14 sm:h-16 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 border-t border-white/5 hover:bg-white/5 hover:text-white transition-all" onClick={() => runAction('Open secure ledger')}>
                             Access Institutional Ledger
                         </Button>
                     </CardContent>
                 </Card>
             </div>
-
-
-        </div >
+        </div>
     );
 };
 

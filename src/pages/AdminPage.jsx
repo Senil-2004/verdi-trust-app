@@ -106,6 +106,50 @@ const AdminPage = () => {
         }
     };
 
+    const [settingsLoading, setSettingsLoading] = useState(false);
+
+    // Fetch Initial Settings
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const { data, error } = await supabase.from('system_settings').select('*').single();
+                if (error && error.code !== 'PGRST116') throw error;
+                if (data) {
+                    setPlatformFee(data.platform_fee || 2.5);
+                    setVerificationTimeout(data.verification_timeout || 48);
+                    setMaintenanceMode(data.maintenance_mode || false);
+                    setTwoFactorEnabled(data.two_factor_required || true);
+                }
+            } catch (err) {
+                console.error("Failed to fetch settings", err);
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const saveSettings = async () => {
+        setSettingsLoading(true);
+        try {
+            const { error } = await supabase.from('system_settings').upsert({
+                id: 1, // Fixed ID for global settings
+                platform_fee: platformFee,
+                verification_timeout: verificationTimeout,
+                maintenance_mode: maintenanceMode,
+                two_factor_required: twoFactorEnabled,
+                updated_at: new Date().toISOString()
+            });
+
+            if (error) throw error;
+
+            setShowSaveToast(true);
+            setTimeout(() => setShowSaveToast(false), 3000);
+        } catch (err) {
+            console.error("Failed to save settings", err);
+        } finally {
+            setSettingsLoading(false);
+        }
+    };
+
     const updateProjectStatus = async (id, status) => {
         try {
             const { error } = await supabase.from('projects').update({ status }).eq('id', id);
@@ -114,18 +158,19 @@ const AdminPage = () => {
             const proj = projects.find(p => p.id === id);
             if (proj) {
                 await supabase.from('notifications').insert([{
-                    title: `Listing ${status}`,
-                    message: `Asset from ${proj.developer} has been ${status.toLowerCase()}.`
+                    title: `Project ${status}`,
+                    message: `Strategic asset from ${proj.developer} has been ${status.toLowerCase()}.`,
+                    is_read: false
                 }]);
             }
 
             setProjects(projects.map(p => {
                 if (p.id === id) {
                     let statusColor = 'text-slate-400 bg-slate-500/10 border-slate-500/20';
-                    if (status === 'Approved') statusColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                    if (status === 'Approved' || status === 'Active') statusColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
                     if (status === 'Rejected') statusColor = 'text-rose-400 bg-rose-500/10 border-rose-500/20';
                     if (status === 'In Review') statusColor = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-                    return { ...p, status, statusColor };
+                    return { ...p, status: status === 'Active' ? 'Approved' : status, statusColor };
                 }
                 return p;
             }));
@@ -149,62 +194,61 @@ const AdminPage = () => {
     ];
 
     const renderOverview = () => (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-500">
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {stats.map((stat, i) => (
                     <Card key={i} className="border-none glass-morphism hover:scale-[1.02] transition-all duration-300 cursor-default group overflow-hidden">
-                        <CardContent className="p-6 relative">
-                            <div className={`absolute -right-4 -top-4 w-24 h-24 ${stat.color} opacity-[0.05] rounded-full blur-2xl group-hover:opacity-10 transition-opacity`} />
-                            <div className="flex justify-between items-start mb-4">
-                                <div className={`p-3 rounded-2xl ${stat.color} bg-opacity-10 border border-current transition-colors`}>
-                                    <stat.icon className="w-5 h-5" />
+                        <CardContent className="p-5 sm:p-6 relative">
+                            <div className={`absolute -right-4 -top-4 w-20 sm:w-24 h-20 sm:h-24 ${stat.color} opacity-[0.05] rounded-full blur-2xl group-hover:opacity-10 transition-opacity`} />
+                            <div className="flex justify-between items-start mb-3 sm:mb-4">
+                                <div className={`p-2.5 sm:p-3 rounded-2xl ${stat.color} bg-opacity-10 border border-current transition-colors`}>
+                                    <stat.icon className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </div>
-                                <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${stat.trend === 'up' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                                <span className={`text-[9px] sm:text-[10px] font-black px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-widest ${stat.trend === 'up' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
                                     {stat.change}
                                 </span>
                             </div>
                             <div>
-                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em]">{stat.label}</p>
-                                <p className="text-3xl font-black text-white mt-2 tracking-tight">{stat.value}</p>
+                                <p className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-[0.2em]">{stat.label}</p>
+                                <p className="text-2xl sm:text-3xl font-black text-white mt-1 sm:mt-2 tracking-tight">{stat.value}</p>
                             </div>
                         </CardContent>
                     </Card>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
                 {/* Recent Activity */}
-                <Card className="lg:col-span-2 border-none glass-morphism">
-                    <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 pb-6">
+                <Card className="lg:col-span-2 border-none glass-morphism overflow-hidden">
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/5 pb-6 gap-4">
                         <div>
-                            <CardTitle className="text-xl font-black text-white tracking-tight">Verification Pipeline</CardTitle>
-                            <CardDescription className="text-slate-500 font-medium">Monitor project approval status</CardDescription>
+                            <CardTitle className="text-lg sm:text-xl font-black text-white tracking-tight">Verification Pipeline</CardTitle>
+                            <CardDescription className="text-slate-500 font-medium text-xs sm:text-sm">Monitor project approval status</CardDescription>
                         </div>
-                        <Button onClick={() => setActiveTab('projects')} variant="ghost" size="sm" className="text-xs font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10">View All</Button>
+                        <Button onClick={() => setActiveTab('projects')} variant="ghost" size="sm" className="w-full sm:w-auto text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10">View All Records</Button>
                     </CardHeader>
-                    <CardContent className="pt-6">
-                        <div className="space-y-4">
+                    <CardContent className="pt-6 overflow-x-auto">
+                        <div className="space-y-4 min-w-[500px] sm:min-w-0">
                             {projects.slice(0, 5).map((item, i) => (
                                 <div key={i} className="flex items-center justify-between group cursor-default p-3 hover:bg-white/5 rounded-2xl transition-colors">
                                     <div className="flex items-center gap-4">
-                                        <div className={`p-2.5 rounded-xl ${item.statusColor} bg-opacity-10`}>
+                                        <div className={`p-2 sm:p-2.5 rounded-xl ${item.statusColor} bg-opacity-10`}>
                                             <FolderKanban className="w-4 h-4" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-white group-hover:text-emerald-400 transition-colors text-sm tracking-tight">{item.name}</p>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.region} • {item.dev}</p>
+                                            <p className="font-bold text-white group-hover:text-emerald-400 transition-colors text-sm tracking-tight truncate max-w-[150px] sm:max-w-none">{item.name}</p>
+                                            <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.region} • {item.dev}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${item.statusColor}`}>
+                                    <div className="flex items-center gap-3 sm:gap-4">
+                                        <span className={`text-[8px] sm:text-[9px] font-black px-2 sm:px-2.5 py-1 rounded-full uppercase tracking-widest border ${item.statusColor}`}>
                                             {item.status}
                                         </span>
                                         <div className="flex gap-2">
                                             {item.status === 'Pending' && (
                                                 <>
-                                                    <Button onClick={() => updateProjectStatus(item.id, 'Approved')} size="sm" className="h-7 text-[9px] bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-[#080c0a] border border-emerald-500/20 font-black uppercase tracking-widest">Approve</Button>
-                                                    <Button onClick={() => updateProjectStatus(item.id, 'Rejected')} size="sm" className="h-7 text-[9px] bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white border border-rose-500/20 font-black uppercase tracking-widest">Reject</Button>
+                                                    <Button onClick={() => updateProjectStatus(item.id, 'Approved')} size="sm" className="h-7 text-[8px] sm:text-[9px] bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-[#080c0a] border border-emerald-500/20 font-black uppercase tracking-widest px-2 sm:px-3">Approve</Button>
                                                 </>
                                             )}
                                         </div>
@@ -313,64 +357,66 @@ const AdminPage = () => {
                     </Dialog>
                 </div>
             </CardHeader>
-            <CardContent className="p-0">
-                <table className="w-full">
-                    <thead>
-                        <tr className="border-b border-white/5 text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">
-                            <th className="px-8 py-6 text-left">Internal ID</th>
-                            <th className="px-8 py-6 text-left">User</th>
-                            <th className="px-8 py-6 text-left">Role</th>
-                            <th className="px-8 py-6 text-left">Status</th>
-                            <th className="px-8 py-6 text-left">Join Date</th>
-                            <th className="px-8 py-6 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-sm">
-                        {users.filter(u =>
-                            u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            u.role.toLowerCase().includes(searchQuery.toLowerCase())
-                        ).map((user, i) => (
-                            <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors group">
-                                <td className="px-8 py-6 text-slate-500 font-mono text-xs">{user.id}</td>
-                                <td className="px-8 py-6">
-                                    <div className="flex flex-col">
-                                        <span className="font-bold text-white uppercase tracking-tight text-sm">{user.name}</span>
-                                        <span className="text-xs text-slate-500 font-medium">{user.email}</span>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-6">
-                                    <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 bg-white/5 rounded-lg text-slate-300 border border-white/5">{user.role}</span>
-                                </td>
-                                <td className="px-8 py-6">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500'}`} />
-                                        <span className={`text-xs font-bold ${user.status === 'Active' ? 'text-emerald-400' : 'text-amber-400'}`}>{user.status}</span>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-6 text-xs text-slate-500 font-bold uppercase tracking-wider">{user.date}</td>
-                                <td className="px-8 py-6 text-right">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 text-[10px] px-4 font-black text-rose-500 bg-rose-500/5 hover:bg-rose-500 hover:text-white uppercase tracking-widest transition-all rounded-lg"
-                                        onClick={() => deleteUser(user.id)}
-                                    >
-                                        Delete
-                                    </Button>
-                                </td>
+            <CardContent className="p-0 overflow-x-auto">
+                <div className="min-w-[800px]">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="border-b border-white/5 text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">
+                                <th className="px-8 py-6 text-left">Internal ID</th>
+                                <th className="px-8 py-6 text-left">User</th>
+                                <th className="px-8 py-6 text-left">Role</th>
+                                <th className="px-8 py-6 text-left">Status</th>
+                                <th className="px-8 py-6 text-left">Join Date</th>
+                                <th className="px-8 py-6 text-right">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="text-sm">
+                            {users.filter(u =>
+                                u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                u.role.toLowerCase().includes(searchQuery.toLowerCase())
+                            ).map((user, i) => (
+                                <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors group">
+                                    <td className="px-8 py-6 text-slate-500 font-mono text-xs">{user.id}</td>
+                                    <td className="px-8 py-6">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-white uppercase tracking-tight text-sm">{user.name}</span>
+                                            <span className="text-xs text-slate-500 font-medium">{user.email}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-6">
+                                        <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 bg-white/5 rounded-lg text-slate-300 border border-white/5">{user.role}</span>
+                                    </td>
+                                    <td className="px-8 py-6">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500'}`} />
+                                            <span className={`text-xs font-bold ${user.status === 'Active' ? 'text-emerald-400' : 'text-amber-400'}`}>{user.status}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-6 text-xs text-slate-500 font-bold uppercase tracking-wider">{user.date}</td>
+                                    <td className="px-8 py-6 text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 text-[10px] px-4 font-black text-rose-500 bg-rose-500/5 hover:bg-rose-500 hover:text-white uppercase tracking-widest transition-all rounded-lg"
+                                            onClick={() => deleteUser(user.id)}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </CardContent>
         </Card>
     );
 
     return (
-        <div className="flex min-h-screen bg-[#080c0a] text-slate-300 font-['Outfit']">
-            {/* Sidebar Styling adjusted for DashboardLayout context */}
-            <aside className="w-64 glass-morphism border-r border-white/5 flex flex-col fixed top-16 bottom-0 z-40">
+        <div className="flex min-h-screen bg-[#080c0a] text-slate-300 font-['Outfit'] relative overflow-x-hidden">
+            {/* Sidebar Desktop */}
+            <aside className="hidden md:flex w-64 glass-morphism border-r border-white/5 flex-col fixed top-16 bottom-0 z-40 overflow-y-auto">
                 <div className="p-6">
                     <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-6 px-4">Admin Console</p>
                     <nav className="space-y-2">
@@ -394,76 +440,104 @@ const AdminPage = () => {
                 </div>
             </aside>
 
-            <main className="flex-1 ml-64 p-8">
-                <header className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-                    <h2 className="text-4xl font-black text-white tracking-tight">
-                        {sidebarItems.find(i => i.id === activeTab)?.label}.
-                    </h2>
-                    <p className="text-slate-500 mt-2 font-medium text-lg">Platform oversight and configuration</p>
+            {/* Mobile Tab Navigation */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-morphism-heavy border-t border-white/10 px-4 py-3">
+                <div className="flex justify-between items-center gap-2">
+                    {sidebarItems.map((item) => (
+                        <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`flex flex-col items-center gap-1 flex-1 py-1 rounded-xl transition-all ${activeTab === item.id ? 'text-emerald-400' : 'text-slate-500'}`}
+                        >
+                            <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'scale-110' : ''}`} />
+                            <span className="text-[8px] font-black uppercase tracking-widest">{item.label.split(' ')[0]}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <main className="flex-1 md:ml-64 p-4 sm:p-8 pb-24 md:pb-8">
+                <header className="mb-8 sm:mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 sm:gap-0">
+                        <div>
+                            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
+                                {sidebarItems.find(i => i.id === activeTab)?.label}.
+                            </h2>
+                            <p className="text-slate-500 mt-2 font-medium text-sm sm:text-lg">Platform oversight and configuration</p>
+                        </div>
+                        {activeTab === 'settings' && (
+                            <div className="p-1 rounded-xl bg-white/5 border border-white/5 flex gap-1">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mt-1.5 ml-2" />
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pr-2">System Live Status</span>
+                            </div>
+                        )}
+                    </div>
                 </header>
 
                 {activeTab === 'overview' && renderOverview()}
                 {activeTab === 'users' && renderUsers()}
                 {activeTab === 'projects' && (
-                    <Card className="border-none glass-morphism animate-in slide-in-from-bottom-4 duration-500">
-                        <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 pb-6">
+                    <Card className="border-none glass-morphism animate-in slide-in-from-bottom-4 duration-500 overflow-hidden rounded-[2rem]">
+                        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/5 pb-8 gap-6 p-6 sm:p-8">
                             <div>
-                                <CardTitle className="text-3xl font-black text-white tracking-tight">Project Review.</CardTitle>
-                                <CardDescription className="text-slate-500 font-medium mt-2">Verify and approve environmental projects</CardDescription>
+                                <CardTitle className="text-xl sm:text-3xl font-black text-white tracking-tight">Project Review.</CardTitle>
+                                <CardDescription className="text-slate-500 font-medium mt-2 text-xs sm:text-sm">Verify and approve environmental projects</CardDescription>
                             </div>
-                            <div className="relative w-64">
+                            <div className="relative w-full sm:w-64">
                                 <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
                                 <Input
                                     className="pl-11 h-12 bg-white/5 border-white/10 text-white rounded-xl focus:ring-emerald-500/20 font-medium"
-                                    placeholder="Search projects..."
+                                    placeholder="Search registry..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
                         </CardHeader>
-                        <CardContent className="p-0">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-white/5 text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">
-                                        <th className="px-8 py-6 text-left">Project Name</th>
-                                        <th className="px-8 py-6 text-left">Developer</th>
-                                        <th className="px-8 py-6 text-left">Region</th>
-                                        <th className="px-8 py-6 text-left">Date</th>
-                                        <th className="px-8 py-6 text-left">Status</th>
-                                        <th className="px-8 py-6 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm">
-                                    {projects.filter(p =>
-                                        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                        p.dev.toLowerCase().includes(searchQuery.toLowerCase())
-                                    ).map((project, i) => (
-                                        <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                                            <td className="px-8 py-6 font-bold text-white text-sm">{project.name}</td>
-                                            <td className="px-8 py-6 text-slate-400 font-medium">{project.dev}</td>
-                                            <td className="px-8 py-6 text-slate-500 uppercase tracking-wider text-xs font-bold">{project.region}</td>
-                                            <td className="px-8 py-6 text-slate-500 font-mono text-xs">{project.date}</td>
-                                            <td className="px-8 py-6">
-                                                <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${project.statusColor}`}>
-                                                    {project.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-8 py-6 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    {project.status === 'Pending' ? (
-                                                        <>
-                                                            <Button onClick={() => updateProjectStatus(project.id, 'Approved')} size="sm" className="h-8 font-black uppercase tracking-widest text-[10px] bg-emerald-500 text-[#080c0a] hover:bg-emerald-400">Approve</Button>
-                                                            <Button onClick={() => updateProjectStatus(project.id, 'Rejected')} size="sm" className="h-8 font-black uppercase tracking-widest text-[10px] bg-white/5 text-slate-400 hover:text-white hover:bg-rose-500">Reject</Button>
-                                                        </>
-                                                    ) : (
-                                                        <Button variant="outline" size="sm" className="h-8 opacity-30 cursor-not-allowed bg-transparent border-white/10 text-slate-500 font-black text-[10px] uppercase tracking-widest" disabled>Resolved</Button>
-                                                    )}
-                                                </div>
-                                            </td>
+                        <CardContent className="p-0 overflow-x-auto">
+                            <div className="min-w-[800px]">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-white/5 text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">
+                                            <th className="px-8 py-6 text-left">Project Name</th>
+                                            <th className="px-8 py-6 text-left">Developer</th>
+                                            <th className="px-8 py-6 text-left">Region</th>
+                                            <th className="px-8 py-6 text-left">Date</th>
+                                            <th className="px-8 py-6 text-left">Status</th>
+                                            <th className="px-8 py-6 text-right">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="text-sm">
+                                        {projects.filter(p =>
+                                            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                            p.dev.toLowerCase().includes(searchQuery.toLowerCase())
+                                        ).map((project, i) => (
+                                            <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors group">
+                                                <td className="px-8 py-6 font-bold text-white text-sm">{project.name}</td>
+                                                <td className="px-8 py-6 text-slate-400 font-medium">{project.dev}</td>
+                                                <td className="px-8 py-6 text-slate-500 uppercase tracking-wider text-[10px] sm:text-xs font-bold">{project.region}</td>
+                                                <td className="px-8 py-6 text-slate-500 font-mono text-[10px] sm:text-xs">{project.date}</td>
+                                                <td className="px-8 py-6">
+                                                    <span className={`text-[8px] sm:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${project.statusColor}`}>
+                                                        {project.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-6 text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        {project.status === 'Pending' || project.status === 'Submitted' || project.status === 'In Review' ? (
+                                                            <>
+                                                                <Button onClick={() => updateProjectStatus(project.id, 'Approved')} size="sm" className="h-8 font-black uppercase tracking-widest text-[10px] bg-emerald-500 hover:bg-emerald-400 text-[#080c0a] px-4 rounded-xl">Approve</Button>
+                                                                <Button onClick={() => updateProjectStatus(project.id, 'Rejected')} size="sm" className="h-8 font-black uppercase tracking-widest text-[10px] bg-white/5 text-slate-400 hover:text-white hover:bg-rose-500 px-4 rounded-xl border border-white/10">Reject</Button>
+                                                            </>
+                                                        ) : (
+                                                            <Button variant="outline" size="sm" className="h-8 opacity-40 cursor-not-allowed bg-transparent border-white/10 text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl" disabled>Resolved</Button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </CardContent>
                     </Card>
                 )}
@@ -507,13 +581,12 @@ const AdminPage = () => {
                                     </button>
                                 </div>
                                 <Button
-                                    onClick={() => {
-                                        setShowSaveToast(true);
-                                        setTimeout(() => setShowSaveToast(false), 3000);
-                                    }}
-                                    className="w-full h-14 bg-emerald-500 text-[#080c0a] font-black rounded-xl uppercase tracking-widest hover:bg-emerald-400"
+                                    onClick={saveSettings}
+                                    disabled={settingsLoading}
+                                    className="w-full h-14 bg-emerald-500 text-[#080c0a] font-black rounded-xl uppercase tracking-widest hover:bg-emerald-400 group relative overflow-hidden"
                                 >
-                                    {showSaveToast ? 'Settings Saved Successfully!' : 'Save Parameters'}
+                                    <div className={`absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700`} />
+                                    {settingsLoading ? 'Saving...' : showSaveToast ? 'Settings Saved Successfully!' : 'Save Parameters'}
                                 </Button>
                             </CardContent>
                         </Card>
