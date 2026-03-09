@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { ShoppingCart, Award, Globe, LineChart, Search, Filter, ArrowUpRight, CheckCircle2, TrendingUp, Download, Leaf, ShieldCheck, Calendar, Zap, Info, CreditCard, Lock, Wallet, FileText } from 'lucide-react';
-
+import { ShoppingCart, Award, Globe, LineChart, Search, Filter, ArrowUpRight, CheckCircle2, TrendingUp, Download, Leaf, ShieldCheck, Calendar, Zap, Info, CreditCard, Lock, Wallet, FileText, Store, ArrowRight } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
@@ -46,7 +46,6 @@ const BuyerDashboard = () => {
     const [purchaseQty, setPurchaseQty] = useState('');
     const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '' });
@@ -59,24 +58,30 @@ const BuyerDashboard = () => {
         setLoading(true);
         setError(null);
         try {
-            const [statsRes, listingsRes, projectsRes, transactionsRes] = await Promise.all([
-                fetch('/api/buyer/stats'),
-                fetch('/api/listings'),
-                fetch('/api/projects'),
-                fetch('/api/transactions')
+            // Fetch everything from Supabase in parallel
+            const [listingsRes, projectsRes, transactionsRes] = await Promise.all([
+                supabase.from('listings').select('*').neq('status', 'In Review').order('created_at', { ascending: false }),
+                supabase.from('projects').select('*').order('submitted_at', { ascending: false }),
+                supabase.from('transactions').select('*').order('transaction_date', { ascending: false })
             ]);
 
-            if (!statsRes.ok || !listingsRes.ok || !projectsRes.ok || !transactionsRes.ok) throw new Error('Systems Connectivity Issue');
+            if (listingsRes.error) throw listingsRes.error;
+            if (projectsRes.error) throw projectsRes.error;
+            if (transactionsRes.error) throw transactionsRes.error;
 
-            const statsData = await statsRes.json();
-            const listingsData = await listingsRes.json();
-            const projectsData = await projectsRes.json();
-            const transactionsData = await transactionsRes.json();
+            const listingsData = listingsRes.data || [];
+            const projectsData = projectsRes.data || [];
+            const transactionsData = transactionsRes.data || [];
+
+            // Calculate Stats manually since we don't have a /stats endpoint anymore
+            const totalCredits = transactionsData.reduce((acc, tx) => acc + Number(tx.credits), 0);
+            const totalSpent = transactionsData.reduce((acc, tx) => acc + Number(tx.amount), 0);
+            const activeProjects = listingsData.filter(l => l.status === 'Active').length;
 
             setStats({
-                totalCredits: Number(statsData.totalCredits) || 0,
-                totalSpent: Number(statsData.totalSpent) || 0,
-                activeProjects: Number(statsData.activeProjects) || 0
+                totalCredits,
+                totalSpent,
+                activeProjects
             });
 
             // Process Monthly Data
@@ -100,14 +105,15 @@ const BuyerDashboard = () => {
 
             setMonthlyData(processedMonthlyData);
 
-            setProjects(listingsData.filter(item => item.status !== 'In Review').map(item => ({
+            setProjects(listingsData.map(item => ({
                 id: item.id,
                 title: item.project_source,
                 origin: item.project_source.includes('Amazon') ? 'Brazil' : item.project_source.includes('Indonesia') ? 'Indonesia' : 'India',
                 price: `₹${Number(item.price).toLocaleString('en-IN')}/ton`,
                 rating: "AAA",
+                // Provide Supabase storage URLs instead of localhost later. For now keep images working.
                 img: item.cover_image
-                    ? (item.cover_image.startsWith('http') ? item.cover_image : `http://localhost:3005/uploads/${item.cover_image}`)
+                    ? (item.cover_image.startsWith('http') ? item.cover_image : `https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads/${item.cover_image}`)
                     : (item.project_source.includes('Amazon') ? 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80' :
                         item.project_source.includes('Wind') ? 'https://images.unsplash.com/photo-1532601224476-15c79f2f7a51?auto=format&fit=crop&w=1200&q=80' :
                             'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80'),
@@ -131,47 +137,51 @@ const BuyerDashboard = () => {
 
     useEffect(() => { fetchData(); }, []);
 
-    const handleOpenPayment = () => { if (selectedProject && purchaseQty) { setIsPurchaseOpen(false); setIsPaymentOpen(true); } };
-
     const handlePurchase = async () => {
+        if (!selectedProject || !purchaseQty || parseInt(purchaseQty, 10) <= 0) return;
+
         const pricePerTon = parseFloat(selectedProject.price.replace('₹', '').replace('/ton', ''));
         const totalAmount = pricePerTon * parseInt(purchaseQty);
 
         const options = {
-            key: "rzp_test_placeholder", // Replace with your actual Razorpay Key ID
+            key: "rzp_test_SL8TAla7mMpzDe",
             amount: totalAmount * 100, // Amount in paise
             currency: "INR",
             name: "VerdiTrust Marketplace",
             description: `Institutional Settlement for ${selectedProject.title}`,
             image: "/vite.svg",
             handler: async function (response) {
-                // Success Callback
+                // Success Callback: Now show the execution state while talking to DB
                 setIsPaymentProcessing(true);
                 try {
-                    const res = await fetch('/api/transactions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            buyer_name: localStorage.getItem('userName') || "Current User",
-                            credits: parseInt(purchaseQty),
-                            amount: totalAmount,
-                            status: "Completed",
-                            razorpay_payment_id: response.razorpay_payment_id
-                        })
-                    });
-                    if (res.ok) {
-                        setPaymentSuccess(true);
-                        setIsPaymentProcessing(false);
-                        setTimeout(() => {
-                            setIsPaymentOpen(false);
-                            setPaymentSuccess(false);
-                            runAction(`Settlement Finalized: ${response.razorpay_payment_id}`);
-                            setPurchaseQty('');
-                            fetchData();
-                        }, 2000);
-                    }
+                    const { error: insertError } = await supabase.from('transactions').insert([{
+                        buyer_name: localStorage.getItem('userName') || "Current User",
+                        credits: parseInt(purchaseQty),
+                        amount: totalAmount,
+                        status: "Completed",
+                        razorpay_payment_id: response.razorpay_payment_id
+                    }]);
+
+                    if (insertError) throw insertError;
+
+                    await supabase.from('notifications').insert([{
+                        title: 'Settlement Processed',
+                        message: `${parseInt(purchaseQty)} tCO2e settled in ${selectedProject.title}`
+                    }]);
+
+                    setIsPaymentProcessing(false);
+                    setPaymentSuccess(true);
+
+                    setTimeout(() => {
+                        setIsPurchaseOpen(false);
+                        setPaymentSuccess(false);
+                        runAction(`Settlement Finalized: ${response.razorpay_payment_id}`);
+                        setPurchaseQty('');
+                        fetchData();
+                    }, 2000);
                 } catch (err) {
                     setIsPaymentProcessing(false);
+                    console.error("Purchase error", err);
                 }
             },
             prefill: {
@@ -201,7 +211,7 @@ const BuyerDashboard = () => {
         csvContent += `"Day","${dayStr}"\n\n`;
         csvContent += headers.join(",") + "\n";
         csvContent += data.map(p => {
-            const certUrl = p.certificate_file ? `http://localhost:3005/uploads/${p.certificate_file}` : 'N/A';
+            const certUrl = p.certificate_file ? `https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads/${p.certificate_file}` : 'N/A';
             return `"${p.title || p.name}","${p.origin || 'N/A'}",${String(p.price || '').replace(/[₹,]/g, '')},${p.vintage || 'N/A'},"${p.standard || 'N/A'}","${p.volume || 'N/A'}","${p.status}","${certUrl}"`;
         }).join("\n");
         const encodedUri = encodeURI(csvContent);
@@ -263,7 +273,7 @@ const BuyerDashboard = () => {
                                 <div className="pt-6 border-t border-white/5">
                                     <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-3">Verification Artifacts</h4>
                                     <a
-                                        href={`http://localhost:3005/uploads/${selectedProject.certificate_file}`}
+                                        href={`https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads/${selectedProject.certificate_file}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         download
@@ -308,101 +318,77 @@ const BuyerDashboard = () => {
 
             <Dialog open={isPurchaseOpen} onOpenChange={setIsPurchaseOpen}>
                 <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[2.5rem] p-8 shadow-2xl max-w-lg w-full overflow-y-auto max-h-[90vh] scrollbar-hide">
-                    <DialogHeader>
-                        <DialogTitle className="text-3xl font-black tracking-tight">Purchase Credits</DialogTitle>
-                        <CardDescription className="text-slate-400 font-medium text-base mt-2">
-                            Deploying capital into {selectedProject?.title}
-                        </CardDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-8">
-                        <div className="space-y-3">
-                            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Inventory Quantity (Tons)</Label>
-                            <Input
-                                type="number"
-                                placeholder="00"
-                                className="h-16 bg-white/5 border-white/10 rounded-2xl text-2xl font-black px-6 focus:ring-emerald-500/20"
-                                value={purchaseQty}
-                                onChange={(e) => setPurchaseQty(e.target.value)}
-                            />
-                        </div>
-                        {selectedProject && purchaseQty && (
-                            <div className="p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 flex justify-between items-center">
-                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Estimated Value</span>
-                                <span className="text-3xl font-black text-emerald-400 tracking-tight">
-                                    ₹{(parseFloat(selectedProject.price.replace(/[₹,]/g, '').replace('/ton', '')) * parseInt(purchaseQty || '0')).toLocaleString('en-IN')}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    <DialogFooter className="gap-4">
-                        <Button variant="ghost" onClick={() => setIsPurchaseOpen(false)} className="h-14 rounded-2xl font-bold px-8">Cancel</Button>
-                        <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black h-14 px-10 rounded-2xl shadow-xl shadow-emerald-900/20" onClick={handleOpenPayment}>Open Checkout</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Payment Modal remains premium as designed previously */}
-            <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-                <DialogContent className="max-w-md p-0 overflow-hidden rounded-[2.5rem] border-none">
-                    <div className="bg-[#0c1210] p-10 text-white">
-                        <div className="flex justify-between items-center mb-8">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-emerald-500 p-2.5 rounded-2xl">
-                                    <ShieldCheck className="w-5 h-5 text-[#080c0a]" />
+                    {!isPaymentProcessing && !paymentSuccess ? (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="text-3xl font-black tracking-tight">Purchase Credits</DialogTitle>
+                                <CardDescription className="text-slate-400 font-medium text-base mt-2">
+                                    Deploying capital into {selectedProject?.title}
+                                </CardDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-8">
+                                <div className="space-y-3">
+                                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Inventory Quantity (Tons)</Label>
+                                    <Input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="00"
+                                        className="h-16 bg-white/5 border-white/10 rounded-2xl text-2xl font-black px-6 focus:ring-emerald-500/20"
+                                        value={purchaseQty}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^0-9]/g, '');
+                                            const maxVol = Number(selectedProject?.volume?.toString().replace(/[^0-9]/g, '') || 0);
+                                            if (val === '') {
+                                                setPurchaseQty('');
+                                            } else {
+                                                const num = parseInt(val, 10);
+                                                setPurchaseQty(num > maxVol ? maxVol.toString() : num.toString());
+                                            }
+                                        }}
+                                    />
                                 </div>
-                                <span className="font-black text-xl tracking-tight">VerdiPay</span>
-                            </div>
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Secure Vault</span>
-                        </div>
-
-                        {!isPaymentProcessing && !paymentSuccess ? (
-                            <div className="space-y-8">
-                                <div>
-                                    <p className="text-5xl font-black tracking-tight text-white">
-                                        ₹{(parseFloat(selectedProject?.price.replace('₹', '').replace('/ton', '') || '0') * parseInt(purchaseQty || '0')).toLocaleString()}
-                                    </p>
-                                    <p className="text-[10px] text-slate-500 mt-2 uppercase font-black tracking-[0.2em]">Transaction Total</p>
-                                </div>
-
-                                <div className="space-y-5">
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Payment Instrument</Label>
-                                        <div className="relative">
-                                            <CreditCard className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" />
-                                            <Input className="bg-white/5 border-white/10 h-16 pl-14 rounded-2xl text-white placeholder:text-slate-700 font-bold" placeholder="0000 0000 0000 0000" />
-                                        </div>
+                                {selectedProject && purchaseQty && (
+                                    <div className="p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 flex justify-between items-center">
+                                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Estimated Value</span>
+                                        <span className="text-3xl font-black text-emerald-400 tracking-tight">
+                                            ₹{(parseFloat(selectedProject.price.replace(/[₹,]/g, '').replace('/ton', '')) * parseInt(purchaseQty || '0')).toLocaleString('en-IN')}
+                                        </span>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-5">
-                                        <Input className="bg-white/5 border-white/10 h-16 rounded-2xl text-white placeholder:text-slate-700 text-center font-bold" placeholder="MM/YY" />
-                                        <Input className="bg-white/5 border-white/10 h-16 rounded-2xl text-white placeholder:text-slate-700 text-center font-bold" placeholder="•••" type="password" />
-                                    </div>
-                                </div>
-
-                                <Button className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#080c0a] font-black h-16 rounded-2xl transition-all shadow-2xl shadow-emerald-500/20 text-lg" onClick={handlePurchase}>Authorize Payment</Button>
+                                )}
                             </div>
-                        ) : isPaymentProcessing ? (
-                            <div className="py-24 flex flex-col items-center justify-center space-y-8">
-                                <div className="relative">
-                                    <div className="w-20 h-20 border-4 border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin"></div>
-                                    <Lock className="w-8 h-8 text-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-2xl font-black">Encrypting...</h3>
-                                    <p className="text-sm text-slate-500 mt-2">Verifying institutional protocols</p>
-                                </div>
+                            <DialogFooter className="gap-4">
+                                <Button variant="ghost" onClick={() => setIsPurchaseOpen(false)} className="h-14 rounded-2xl font-bold px-8">Cancel</Button>
+                                <Button
+                                    className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black h-14 px-10 rounded-2xl shadow-xl shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={handlePurchase}
+                                    disabled={!purchaseQty || parseInt(purchaseQty, 10) === 0}
+                                >
+                                    Confirm Settlement
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    ) : isPaymentProcessing ? (
+                        <div className="py-24 flex flex-col items-center justify-center space-y-8">
+                            <div className="relative">
+                                <div className="w-20 h-20 border-4 border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin"></div>
+                                <Activity className="w-8 h-8 text-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                             </div>
-                        ) : (
-                            <div className="py-24 flex flex-col items-center justify-center space-y-8 animate-in zoom-in-95 duration-500">
-                                <div className="bg-emerald-500/20 p-6 rounded-full order-none glow-emerald">
-                                    <CheckCircle2 className="w-12 h-12 text-emerald-400" />
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-3xl font-black">Success</h3>
-                                    <p className="text-slate-500 mt-3 font-medium">Assets settled in your portfolio.</p>
-                                </div>
+                            <div className="text-center">
+                                <h3 className="text-2xl font-black">Executing...</h3>
+                                <p className="text-sm text-slate-500 mt-2">Finalizing institutional protocols</p>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    ) : (
+                        <div className="py-24 flex flex-col items-center justify-center space-y-8 animate-in zoom-in-95 duration-500">
+                            <div className="bg-emerald-500/20 p-6 rounded-full order-none glow-emerald">
+                                <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-3xl font-black">Success</h3>
+                                <p className="text-slate-500 mt-3 font-medium">Assets settled in your portfolio.</p>
+                            </div>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
 
@@ -527,6 +513,52 @@ const BuyerDashboard = () => {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Become a Seller CTA */}
+            {localStorage.getItem('isSeller') !== 'true' && (
+                <div className="relative overflow-hidden rounded-[3rem] mt-12 group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 via-teal-600/10 to-cyan-600/20 group-hover:from-emerald-600/30 group-hover:via-teal-600/20 group-hover:to-cyan-600/30 transition-all duration-700" />
+                    <div className="absolute top-[-50%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px] group-hover:scale-150 transition-transform duration-1000" />
+                    <div className="absolute bottom-[-30%] left-[-10%] w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-[80px] group-hover:scale-125 transition-transform duration-1000" />
+
+                    <div className="relative z-10 glass-morphism border-emerald-500/10 group-hover:border-emerald-500/20 transition-all rounded-[3rem] p-12 md:p-16">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
+                            <div className="flex-1 space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400 border border-emerald-500/20 group-hover:scale-110 transition-transform">
+                                        <Store className="w-7 h-7" />
+                                    </div>
+                                    <span className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">Seller Program</span>
+                                </div>
+
+                                <h3 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-tight">
+                                    Start Selling Carbon Credits
+                                </h3>
+                                <p className="text-base text-slate-400 font-medium leading-relaxed max-w-xl">
+                                    Join the VerdiTrust marketplace as a verified seller. List your carbon offset projects and connect with institutional buyers worldwide.
+                                </p>
+
+                                <div className="flex flex-wrap gap-4 pt-2">
+                                    {['List Offset Projects', 'Access Global Buyers', 'Institutional Settlement'].map((benefit, i) => (
+                                        <div key={i} className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                            <span className="text-xs font-bold text-slate-300">{benefit}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <Button
+                                onClick={() => navigate('/seller-onboarding')}
+                                className="h-16 px-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm uppercase tracking-widest shadow-2xl shadow-emerald-900/30 transition-all hover:scale-105 active:scale-[0.98] flex items-center gap-3 shrink-0"
+                            >
+                                Become a Seller
+                                <ArrowRight className="w-5 h-5" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

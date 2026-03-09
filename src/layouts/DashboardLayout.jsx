@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { CardDescription } from '../components/ui/card';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
+import { supabase } from '../lib/supabase';
 
 const DashboardLayout = () => {
     const navigate = useNavigate();
@@ -28,16 +29,29 @@ const DashboardLayout = () => {
 
     const fetchNotifications = async () => {
         try {
-            const res = await fetch('/api/notifications');
-            const data = await res.json();
-            setNotifications(data.map(n => ({
+            const { data, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(20);
+            if (error) throw error;
+            setNotifications((data || []).map(n => ({
                 ...n,
-                read: n.is_read, // Map DB snake_case to camelCase if needed, or keep consistent
-                time: new Date(n.created_at).toLocaleDateString() // Simple formatting
+                read: n.is_read,
+                time: getRelativeTime(new Date(n.created_at))
             })));
         } catch (error) {
             console.error("Failed to fetch notifications", error);
         }
+    };
+
+    const getRelativeTime = (date) => {
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
     };
 
     const fetchUserProfile = async () => {
@@ -45,12 +59,22 @@ const DashboardLayout = () => {
         if (!email) return;
 
         try {
-            const res = await fetch(`/api/users/profile?email=${email}`);
-            const data = await res.json();
-            if (res.ok) {
+            const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
+            if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+            if (data) {
                 setUserProfile(data);
                 if (data.name) {
                     localStorage.setItem('userName', data.name);
+                }
+
+                // Hard lock sellers into the seller perspective
+                const isSellerRole = data.role === 'Project Developer' || data.role === 'seller';
+                if (isSellerRole) {
+                    localStorage.setItem('isSeller', 'true');
+                    if (location.pathname.includes('/buyer')) {
+                        console.warn("User is a seller. Redirecting from buyer dashboard.");
+                        navigate('/seller', { replace: true });
+                    }
                 }
             }
         } catch (error) {
@@ -61,13 +85,34 @@ const DashboardLayout = () => {
     useEffect(() => {
         fetchNotifications();
         fetchUserProfile();
-    }, []);
+
+        // Real-time subscription: auto-refresh bell when any new notification is inserted
+        const channel = supabase
+            .channel('realtime:notifications')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'notifications' },
+                (payload) => {
+                    const n = payload.new;
+                    setNotifications(prev => [{
+                        ...n,
+                        read: n.is_read,
+                        time: 'Just now'
+                    }, ...prev]);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [location.pathname]);
 
     const markAllAsRead = async () => {
         try {
-            await fetch('/api/notifications/read', { method: 'PUT' });
-            // Optimistically update UI
-            setNotifications(notifications.map(n => ({ ...n, read: 1 })));
+            const { error } = await supabase.from('notifications').update({ is_read: true }).eq('is_read', false);
+            if (error) throw error;
+            setNotifications(notifications.map(n => ({ ...n, read: true })));
         } catch (error) {
             console.error("Failed to mark notifications as read", error);
         }
@@ -146,12 +191,24 @@ const DashboardLayout = () => {
                                         ) : (
                                             <div className="divide-y divide-white/5">
                                                 {notifications.map((n) => (
-                                                    <div key={n.id} className={`p-4 hover:bg-white/5 transition-colors cursor-pointer group ${!n.read ? 'bg-emerald-500/5' : ''}`}>
+                                                    <div
+                                                        key={n.id}
+                                                        className={`p-4 hover:bg-white/5 transition-colors cursor-pointer group ${!n.read ? 'bg-emerald-500/5' : ''}`}
+                                                        onClick={async () => {
+                                                            if (!n.read) {
+                                                                await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
+                                                                setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+                                                            }
+                                                        }}
+                                                    >
                                                         <div className="flex gap-3">
-                                                            <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${!n.read ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-                                                            <div>
+                                                            <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.read ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`} />
+                                                            <div className="flex-1 min-w-0">
                                                                 <p className={`text-xs ${!n.read ? 'text-white font-bold' : 'text-slate-400 font-medium'}`}>{n.title}</p>
-                                                                <p className="text-[10px] text-slate-500 mt-1">{n.time}</p>
+                                                                {n.message && (
+                                                                    <p className="text-[10px] text-slate-600 mt-0.5 leading-relaxed line-clamp-2">{n.message}</p>
+                                                                )}
+                                                                <p className="text-[10px] text-slate-600 mt-1.5 font-black uppercase tracking-wider">{n.time}</p>
                                                             </div>
                                                         </div>
                                                     </div>

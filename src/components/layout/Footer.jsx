@@ -39,10 +39,10 @@ const Footer = () => {
                     <Leaf className="w-5 h-5 text-emerald-400" />
                     <span className="text-lg font-black text-white tracking-tighter">VerdiTrust</span>
                 </Link>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-700">
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
                     © 2026 VERDITRUST ECOLOGICAL LEDGER. ALL RIGHTS RESERVED.
                 </p>
-                <div className="flex gap-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                <div className="flex gap-8 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
                     <button onClick={() => setOpenDialog('privacy')} className="hover:text-white transition-colors uppercase">Privacy</button>
                     <button onClick={() => setOpenDialog('terms')} className="hover:text-white transition-colors uppercase">Terms</button>
                     <button onClick={() => setOpenDialog('security')} className="hover:text-white transition-colors uppercase">Security</button>

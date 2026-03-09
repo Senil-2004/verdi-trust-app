@@ -4,7 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Leaf, ShieldCheck, Factory, Globe, CheckCircle2 } from 'lucide-react';
+import { Leaf, ShieldCheck, Globe, CheckCircle2, ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+const SPECIAL_CHARS = /[+\-*/\\=@#$%^&!~`|<>{}[\]()]/;
+const SPACES_ONLY = /^\s+$/;
 
 const SellerOnboarding = () => {
     const navigate = useNavigate();
@@ -19,24 +23,47 @@ const SellerOnboarding = () => {
     });
     const [errors, setErrors] = useState({});
 
+    const validateField = (id, value) => {
+        if (SPACES_ONLY.test(value)) return 'Cannot be only spaces';
+        if (id === 'companyName') {
+            if (!value.trim()) return 'Company name is required';
+            if (SPECIAL_CHARS.test(value)) return 'No special characters allowed (+, -, *, / etc.)';
+            if (value.trim().length < 2) return 'Must be at least 2 characters';
+        }
+        if (id === 'taxId') {
+            if (!value.trim()) return 'Registration ID is required';
+            if (/\s/.test(value)) return 'No spaces allowed in registration ID';
+            if (/[*\/\\+=#$%^&!~`|<>{}[\]()]/.test(value)) return 'No special characters like *, /, +, = etc.';
+        }
+        if (id === 'website') {
+            if (!value.trim()) return 'Website is required';
+            if (/\s/.test(value)) return 'No spaces allowed in URL';
+            if (!/^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i.test(value)) return 'Enter a valid URL';
+        }
+        if (id === 'projectLocation') {
+            if (!value.trim()) return 'Project location is required';
+            if (SPECIAL_CHARS.test(value)) return 'No special characters allowed';
+        }
+        if (id === 'estimatedCredits') {
+            if (!value) return 'Credits estimate is required';
+            if (/\s/.test(value)) return 'No spaces allowed';
+            if (Number(value) <= 0) return 'Must be a positive number';
+            if (!/^\d+$/.test(value)) return 'Only whole numbers allowed';
+        }
+        return '';
+    };
+
     const validateStep = (currentStep) => {
         const newErrors = {};
-        if (currentStep === 1) {
-            if (!formData.companyName.trim()) newErrors.companyName = 'Company name is required';
-            if (!formData.taxId.trim()) newErrors.taxId = 'Tax ID / Registration is required';
-            if (!formData.website.trim()) {
-                newErrors.website = 'Website is required';
-            } else if (!/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(formData.website)) {
-                newErrors.website = 'Please enter a valid URL';
-            }
-        } else if (currentStep === 2) {
-            if (!formData.projectLocation.trim()) newErrors.projectLocation = 'Project location is required';
-            if (!formData.estimatedCredits) {
-                newErrors.estimatedCredits = 'Credits estimate is required';
-            } else if (Number(formData.estimatedCredits) <= 0) {
-                newErrors.estimatedCredits = 'Must be a positive number';
-            }
-        }
+        const fields = currentStep === 1
+            ? ['companyName', 'taxId', 'website']
+            : ['projectLocation', 'estimatedCredits'];
+
+        fields.forEach(field => {
+            const err = validateField(field, formData[field]);
+            if (err) newErrors[field] = err;
+        });
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -44,7 +71,9 @@ const SellerOnboarding = () => {
     const handleInputChange = (e) => {
         const { id, value } = e.target;
         setFormData(prev => ({ ...prev, [id]: value }));
-        if (errors[id]) setErrors(prev => ({ ...prev, [id]: '' }));
+        // Live validation — clear error on valid input
+        const err = validateField(id, value);
+        setErrors(prev => ({ ...prev, [id]: err }));
     };
 
     const handleNext = () => {
@@ -55,172 +84,183 @@ const SellerOnboarding = () => {
 
     const handleSubmit = async () => {
         try {
-            // Update role in database
-            await fetch('/api/users/role', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: 'buyer@verditrust.com', role: 'Project Developer' })
-            });
-
-            // Update local state
+            const email = localStorage.getItem('userEmail');
+            if (email) {
+                await supabase.from('users').update({ role: 'Project Developer' }).eq('email', email);
+            }
             localStorage.setItem('isSeller', 'true');
-            // Check if we need to update userName role in localStorage? Usually just isSeller flag is enough for the dashboard.
-
-            navigate('/seller');
+            navigate('/seller', { replace: true });
         } catch (error) {
             console.error("Onboarding error:", error);
-            // Fallback navigation even if API fails (e.g. offline dev)
             localStorage.setItem('isSeller', 'true');
-            navigate('/seller');
+            navigate('/seller', { replace: true });
         }
     };
 
+    const inputClass = (field) =>
+        `h-14 bg-white/5 border ${errors[field] ? 'border-rose-500/50 bg-rose-500/5' : 'border-white/10'} rounded-2xl px-5 text-sm font-bold text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all outline-none`;
+
     return (
-        <div className="min-h-screen bg-[#f8fbfa] flex items-center justify-center p-6 bg-gradient-to-br from-green-50 via-white to-teal-50">
-            <div className="w-full max-w-2xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="flex items-center justify-center p-6 md:p-12 min-h-[calc(100vh-4rem)]">
+            <div className="w-full max-w-xl animate-in fade-in zoom-in-95 duration-500">
+                {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center p-3 bg-teal-600 rounded-2xl shadow-xl shadow-teal-500/20 mb-4">
-                        <Leaf className="w-8 h-8 text-white" />
+                    <div className="inline-flex items-center justify-center p-3.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-xl shadow-emerald-500/20 mb-5">
+                        <Leaf className="w-7 h-7 text-[#080c0a]" />
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Become a Verified Seller</h1>
-                    <p className="text-slate-500 font-medium">Complete your profile to start issuing carbon credits</p>
+                    <h1 className="text-3xl font-black text-white tracking-tight">Become a Verified Seller</h1>
+                    <p className="text-slate-500 font-medium mt-2">Complete your profile to start issuing carbon credits</p>
                 </div>
 
-                <div className="flex items-center justify-center gap-4 mb-8">
-                    <div className={`h-2 w-16 rounded-full transition-colors duration-500 ${step >= 1 ? 'bg-teal-600 shadow-[0_0_10px_rgba(20,184,166,0.3)]' : 'bg-slate-200'}`} />
-                    <div className={`h-2 w-16 rounded-full transition-colors duration-500 ${step >= 2 ? 'bg-teal-600 shadow-[0_0_10px_rgba(20,184,166,0.3)]' : 'bg-slate-200'}`} />
+                {/* Progress */}
+                <div className="flex items-center justify-center gap-3 mb-8">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 ${step >= 1 ? 'bg-emerald-500 text-[#080c0a] shadow-lg shadow-emerald-500/30' : 'bg-white/10 text-slate-600'}`}>1</div>
+                        <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${step >= 1 ? 'text-emerald-400' : 'text-slate-600'}`}>Company</span>
+                    </div>
+                    <div className={`h-px w-12 transition-colors duration-500 ${step >= 2 ? 'bg-emerald-500' : 'bg-white/10'}`} />
+                    <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 ${step >= 2 ? 'bg-emerald-500 text-[#080c0a] shadow-lg shadow-emerald-500/30' : 'bg-white/10 text-slate-600'}`}>2</div>
+                        <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${step >= 2 ? 'text-emerald-400' : 'text-slate-600'}`}>Verification</span>
+                    </div>
                 </div>
 
-                <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
+                {/* Form Card */}
+                <Card className="border-none glass-morphism rounded-[2.5rem] overflow-hidden">
                     {step === 1 ? (
                         <div className="animate-in slide-in-from-right-8 duration-500">
-                            <CardHeader className="pb-8">
-                                <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-900">
-                                    <Globe className="w-5 h-5 text-teal-600" />
+                            <CardHeader className="pb-6 px-8 pt-8">
+                                <CardTitle className="text-lg font-black flex items-center gap-3 text-white">
+                                    <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
+                                        <Globe className="w-4 h-4" />
+                                    </div>
                                     Company Details
                                 </CardTitle>
-                                <CardDescription className="text-slate-500">Basic information about your organization</CardDescription>
+                                <CardDescription className="text-slate-500 font-medium ml-11">Basic information about your organization</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <CardContent className="space-y-5 px-8 pb-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="space-y-2">
-                                        <Label htmlFor="companyName" className={`text-xs font-bold uppercase tracking-wider ${errors.companyName ? 'text-rose-500' : 'text-slate-500'}`}>Legal Company Name</Label>
+                                        <Label htmlFor="companyName" className={`text-[10px] font-black uppercase tracking-[0.15em] ${errors.companyName ? 'text-rose-400' : 'text-slate-500'}`}>Legal Company Name</Label>
                                         <Input
                                             id="companyName"
                                             placeholder="Global Reforest Inc."
                                             value={formData.companyName}
                                             onChange={handleInputChange}
-                                            className={`h-12 bg-slate-50 border-slate-100 rounded-xl text-slate-900 placeholder:text-slate-400 ${errors.companyName ? 'border-rose-500 bg-rose-50/30' : ''}`}
+                                            className={inputClass('companyName')}
                                         />
-                                        {errors.companyName && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest leading-none mt-1">{errors.companyName}</p>}
+                                        {errors.companyName && <p className="text-[10px] font-bold text-rose-400 flex items-center gap-1.5 mt-1"><AlertCircle className="w-3 h-3" />{errors.companyName}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="taxId" className={`text-xs font-bold uppercase tracking-wider ${errors.taxId ? 'text-rose-500' : 'text-slate-500'}`}>Business Registration ID</Label>
+                                        <Label htmlFor="taxId" className={`text-[10px] font-black uppercase tracking-[0.15em] ${errors.taxId ? 'text-rose-400' : 'text-slate-500'}`}>Business Registration ID</Label>
                                         <Input
                                             id="taxId"
-                                            placeholder="TAX-990-21"
+                                            placeholder="TAX99021"
                                             value={formData.taxId}
                                             onChange={handleInputChange}
-                                            className={`h-12 bg-slate-50 border-slate-100 rounded-xl text-slate-900 placeholder:text-slate-400 ${errors.taxId ? 'border-rose-500 bg-rose-50/30' : ''}`}
+                                            className={inputClass('taxId')}
                                         />
-                                        {errors.taxId && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest leading-none mt-1">{errors.taxId}</p>}
+                                        {errors.taxId && <p className="text-[10px] font-bold text-rose-400 flex items-center gap-1.5 mt-1"><AlertCircle className="w-3 h-3" />{errors.taxId}</p>}
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="website" className={`text-xs font-bold uppercase tracking-wider ${errors.website ? 'text-rose-500' : 'text-slate-500'}`}>Company Website</Label>
+                                    <Label htmlFor="website" className={`text-[10px] font-black uppercase tracking-[0.15em] ${errors.website ? 'text-rose-400' : 'text-slate-500'}`}>Company Website</Label>
                                     <Input
                                         id="website"
                                         placeholder="https://example.com"
                                         value={formData.website}
                                         onChange={handleInputChange}
-                                        className={`h-12 bg-slate-50 border-slate-100 rounded-xl text-slate-900 placeholder:text-slate-400 ${errors.website ? 'border-rose-500 bg-rose-50/30' : ''}`}
+                                        className={inputClass('website')}
                                     />
-                                    {errors.website && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest leading-none mt-1">{errors.website}</p>}
+                                    {errors.website && <p className="text-[10px] font-bold text-rose-400 flex items-center gap-1.5 mt-1"><AlertCircle className="w-3 h-3" />{errors.website}</p>}
                                 </div>
                             </CardContent>
                         </div>
                     ) : (
                         <div className="animate-in slide-in-from-right-8 duration-500">
-                            <CardHeader className="pb-8">
-                                <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-900">
-                                    <ShieldCheck className="w-5 h-5 text-teal-600" />
+                            <CardHeader className="pb-6 px-8 pt-8">
+                                <CardTitle className="text-lg font-black flex items-center gap-3 text-white">
+                                    <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
+                                        <ShieldCheck className="w-4 h-4" />
+                                    </div>
                                     Verification Details
                                 </CardTitle>
-                                <CardDescription className="text-slate-500">Information needed for initial project review</CardDescription>
+                                <CardDescription className="text-slate-500 font-medium ml-11">Information needed for project review</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-6">
+                            <CardContent className="space-y-5 px-8 pb-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="projectType" className="text-xs font-bold uppercase tracking-wider text-slate-500">Primary Project Type</Label>
+                                    <Label htmlFor="projectType" className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Primary Project Type</Label>
                                     <select
                                         id="projectType"
-                                        className="w-full h-12 px-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-teal-500 transition-all outline-none text-slate-900"
+                                        className="w-full h-14 px-5 rounded-2xl border border-white/10 bg-white/5 text-sm font-bold text-white focus:ring-2 focus:ring-emerald-500/30 transition-all outline-none appearance-none"
                                         value={formData.projectType}
                                         onChange={handleInputChange}
                                     >
-                                        <option>Reforestation</option>
-                                        <option>Renewable Energy</option>
-                                        <option>Methane Capture</option>
-                                        <option>Blue Carbon</option>
+                                        <option className="bg-[#080c0a]">Reforestation</option>
+                                        <option className="bg-[#080c0a]">Renewable Energy</option>
+                                        <option className="bg-[#080c0a]">Methane Capture</option>
+                                        <option className="bg-[#080c0a]">Blue Carbon</option>
                                     </select>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="space-y-2">
-                                        <Label htmlFor="projectLocation" className={`text-xs font-bold uppercase tracking-wider ${errors.projectLocation ? 'text-rose-500' : 'text-slate-500'}`}>Main Project Location</Label>
+                                        <Label htmlFor="projectLocation" className={`text-[10px] font-black uppercase tracking-[0.15em] ${errors.projectLocation ? 'text-rose-400' : 'text-slate-500'}`}>Main Project Location</Label>
                                         <Input
                                             id="projectLocation"
                                             placeholder="Amazon Basin, Brazil"
                                             value={formData.projectLocation}
                                             onChange={handleInputChange}
-                                            className={`h-12 bg-slate-50 border-slate-100 rounded-xl text-slate-900 placeholder:text-slate-400 ${errors.projectLocation ? 'border-rose-500 bg-rose-50/30' : ''}`}
+                                            className={inputClass('projectLocation')}
                                         />
-                                        {errors.projectLocation && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest leading-none mt-1">{errors.projectLocation}</p>}
+                                        {errors.projectLocation && <p className="text-[10px] font-bold text-rose-400 flex items-center gap-1.5 mt-1"><AlertCircle className="w-3 h-3" />{errors.projectLocation}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="estimatedCredits" className={`text-xs font-bold uppercase tracking-wider ${errors.estimatedCredits ? 'text-rose-500' : 'text-slate-500'}`}>Estimated Annual Credits</Label>
+                                        <Label htmlFor="estimatedCredits" className={`text-[10px] font-black uppercase tracking-[0.15em] ${errors.estimatedCredits ? 'text-rose-400' : 'text-slate-500'}`}>Est. Annual Credits (tCO2e)</Label>
                                         <Input
                                             id="estimatedCredits"
-                                            type="number"
+                                            type="text"
                                             placeholder="50000"
                                             value={formData.estimatedCredits}
-                                            onChange={handleInputChange}
-                                            className={`h-12 bg-slate-50 border-slate-100 rounded-xl text-slate-900 placeholder:text-slate-400 ${errors.estimatedCredits ? 'border-rose-500 bg-rose-50/30' : ''}`}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                // Only allow digits
+                                                if (val === '' || /^\d+$/.test(val)) {
+                                                    handleInputChange(e);
+                                                }
+                                            }}
+                                            className={inputClass('estimatedCredits')}
                                         />
-                                        {errors.estimatedCredits && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest leading-none mt-1">{errors.estimatedCredits}</p>}
+                                        {errors.estimatedCredits && <p className="text-[10px] font-bold text-rose-400 flex items-center gap-1.5 mt-1"><AlertCircle className="w-3 h-3" />{errors.estimatedCredits}</p>}
                                     </div>
                                 </div>
-                                <div className="p-4 bg-teal-50 rounded-2xl border border-teal-100 flex items-start gap-3">
-                                    <CheckCircle2 className="w-5 h-5 text-teal-600 mt-0.5" />
-                                    <p className="text-xs text-teal-800 leading-relaxed font-medium">
-                                        By clicking "Complete Application", your account will be converted to a Project Developer role. You will be able to register projects and manage credit issuance.
+                                <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 flex items-start gap-3">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                                    <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                                        By completing this application, your account will be upgraded to a Seller role. You'll be able to list carbon credit offerings on the marketplace.
                                     </p>
                                 </div>
                             </CardContent>
                         </div>
                     )}
 
-                    <CardFooter className="bg-slate-50/50 p-8 border-t border-slate-50 flex justify-between items-center">
+                    <CardFooter className="px-8 py-6 border-t border-white/5 flex justify-between items-center">
                         <Button
                             variant="ghost"
                             onClick={() => step > 1 ? setStep(1) : navigate(-1)}
-                            className="text-slate-500 font-bold"
+                            className="h-12 px-6 rounded-2xl text-slate-500 hover:text-white hover:bg-white/5 font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2"
                         >
-                            {step === 1 ? 'Cancel' : 'Go Back'}
+                            <ArrowLeft className="w-4 h-4" />
+                            {step === 1 ? 'Cancel' : 'Back'}
                         </Button>
                         <Button
                             onClick={handleNext}
-                            variant="primary"
-                            className="px-10 h-12 shadow-teal-500/20"
+                            className="h-12 px-10 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-900/30 transition-all active:scale-[0.98] flex items-center gap-2"
                         >
                             {step === 1 ? 'Next Step' : 'Complete Application'}
+                            <ArrowRight className="w-4 h-4" />
                         </Button>
                     </CardFooter>
                 </Card>
-
-                <div className="mt-8 flex justify-center gap-8 opacity-40 grayscale pointer-events-none">
-                    <Factory className="w-6 h-6" />
-                    <Globe className="w-6 h-6" />
-                    <ShieldCheck className="w-6 h-6" />
-                </div>
             </div>
         </div>
     );

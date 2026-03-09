@@ -42,7 +42,7 @@ const Navbar = () => {
                         <a
                             key={item.name}
                             href={item.href}
-                            className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-emerald-400 transition-all duration-300 hover:scale-105"
+                            className="text-xs font-bold uppercase tracking-[0.15em] text-white/70 hover:text-emerald-400 transition-all duration-300 hover:scale-105"
                         >
                             {item.name}
                         </a>
@@ -51,7 +51,7 @@ const Navbar = () => {
 
                 <div className="flex items-center gap-4">
                     <Link to="/login">
-                        <Button className="h-12 px-8 rounded-2xl bg-white/10 hover:bg-emerald-600 text-white font-black text-[10px] uppercase tracking-[0.2em] border border-white/10 hover:border-emerald-500/50 transition-all duration-500 shadow-xl hover:shadow-emerald-500/20 active:scale-[0.98]">
+                        <Button className="h-12 px-8 rounded-2xl bg-white/10 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-[0.15em] border border-white/10 hover:border-emerald-500/50 transition-all duration-500 shadow-xl hover:shadow-emerald-500/20 active:scale-[0.98]">
                             Establish Access
                         </Button>
                     </Link>
@@ -75,7 +75,7 @@ const Navbar = () => {
                                 key={item.name}
                                 href={item.href}
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className="text-xs font-black uppercase tracking-[0.2em] text-white/60 hover:text-emerald-400 transition-colors"
+                                className="text-sm font-bold uppercase tracking-[0.15em] text-white/70 hover:text-emerald-400 transition-colors"
                             >
                                 {item.name}
                             </a>
@@ -84,7 +84,7 @@ const Navbar = () => {
                         <Link
                             to="/login"
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className="text-xs font-black uppercase tracking-[0.2em] text-white/60 hover:text-white transition-colors"
+                            className="text-sm font-bold uppercase tracking-[0.15em] text-white/70 hover:text-white transition-colors"
                         >
                             Establish Access
                         </Link>

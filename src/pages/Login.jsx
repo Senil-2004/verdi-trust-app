@@ -9,10 +9,16 @@ import {
     GoogleAuthProvider,
     signInWithPopup,
     signInWithEmailAndPassword,
-    createUserWithEmailAndPassword
+    createUserWithEmailAndPassword,
+    browserSessionPersistence,
+    setPersistence,
+    deleteUser
 } from 'firebase/auth';
+
+const googleProvider = new GoogleAuthProvider();
 import { doc, setDoc } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 export function LoginPage() {
     const navigate = useNavigate();
@@ -30,6 +36,7 @@ export function LoginPage() {
     const [errors, setErrors] = useState({});
     const [touched, setTouched] = useState({});
     const [loading, setLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
 
     // Validation Rules
     const validateField = (name, value) => {
@@ -37,17 +44,23 @@ export function LoginPage() {
         switch (name) {
             case 'email':
                 if (!value) error = 'Email is required';
+                else if (/\s/.test(value)) error = 'Email must not contain spaces';
                 else if (!/\S+@\S+\.\S+/.test(value)) error = 'Invalid email format';
                 break;
             case 'password':
                 if (!value) error = 'Password is required';
+                else if (/\s/.test(value)) error = 'Password must not contain spaces';
                 else if (value.length < 6) error = 'Must be at least 6 characters';
                 break;
             case 'confirmPassword':
-                if (isSignUp && value !== formData.password) error = 'Passwords do not match';
+                if (isSignUp && !value) error = 'Please confirm your password';
+                else if (isSignUp && /\s/.test(value)) error = 'Password must not contain spaces';
+                else if (isSignUp && value !== formData.password) error = 'Passwords do not match';
                 break;
             case 'name':
                 if (isSignUp && !value) error = 'Full name is required';
+                else if (isSignUp && value !== value.trim()) error = 'Name must not have leading or trailing spaces';
+                else if (isSignUp && !value.trim()) error = 'Name cannot be only spaces';
                 break;
             default:
                 break;
@@ -116,57 +129,190 @@ export function LoginPage() {
                 const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
                 const user = userCredential.user;
 
-                // Save to Firestore
-                await setDoc(doc(db, "users", user.uid), {
+                // New users are always buyers
+                localStorage.removeItem('isSeller');
+
+                // Save to Firestore (fire and forget)
+                setDoc(doc(db, "users", user.uid), {
                     name: formData.name,
                     email: formData.email,
-                    role: localStorage.getItem('isSeller') === 'true' ? 'seller' : 'buyer',
+                    role: 'buyer',
                     createdAt: new Date().toISOString()
-                });
+                }).catch(err => console.warn("Firestore profile save failed (non-critical):", err));
+
+                // Save to Supabase — the source of truth for roles
+                await supabase.from('users').upsert([{
+                    name: formData.name,
+                    email: formData.email,
+                    role: 'Credit Buyer',
+                    status: 'Active'
+                }], { onConflict: 'email' });
+
+                await supabase.from('notifications').insert([{
+                    title: 'New User Registered',
+                    message: `${formData.name} joined as Credit Buyer.`
+                }]);
 
                 localStorage.setItem('userName', formData.name);
                 localStorage.setItem('userEmail', formData.email);
-                console.log("Firebase Account & DB Entry Created");
+                console.log("Firebase Account Created + Supabase synced");
             } else {
                 // Login Existing User
                 const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-                localStorage.setItem('userName', formData.email.split('@')[0]);
+                const displayName = formData.email.split('@')[0];
+                localStorage.setItem('userName', displayName);
                 localStorage.setItem('userEmail', formData.email);
-                console.log("Firebase Login Success");
+
+                // Upsert into Supabase — sync any existing Firebase user who isn't in DB yet
+                // Only sets role/status if the row doesn't exist; existing rows keep their role.
+                const { data: existing } = await supabase
+                    .from('users')
+                    .select('id, role, name')
+                    .eq('email', formData.email)
+                    .maybeSingle();
+
+                if (!existing) {
+                    await supabase.from('users').insert([{
+                        name: displayName,
+                        email: formData.email,
+                        role: 'Credit Buyer',
+                        status: 'Active'
+                    }]);
+                } else if (existing.name) {
+                    localStorage.setItem('userName', existing.name);
+                }
+                console.log("Firebase Login Success + Supabase synced");
             }
 
             // Navigation Logic
             if (formData.email === 'admin@verditrust.com') {
-                navigate('/admin');
+                navigate('/admin', { replace: true });
+            } else if (isSignUp) {
+                // New sign-ups always go to buyer dashboard
+                navigate('/buyer', { replace: true });
             } else {
-                const isSeller = localStorage.getItem('isSeller') === 'true';
-                navigate(isSeller ? '/seller' : '/buyer');
+                // Check exact role from Supabase for returning users
+                try {
+                    const { data, error } = await supabase.from('users').select('role').eq('email', formData.email).single();
+
+                    if (error || !data) {
+                        try {
+                            if (auth.currentUser) {
+                                await deleteUser(auth.currentUser);
+                            }
+                        } catch (delErr) {
+                            console.error("Failed to self-destruct Firebase auth:", delErr);
+                        }
+                        setError("This account has been permanently deleted from the database. Please sign up again.");
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    if (data?.role === 'Project Developer' || data?.role === 'seller' || localStorage.getItem('isSeller') === 'true') {
+                        localStorage.setItem('isSeller', 'true');
+                        navigate('/seller', { replace: true });
+                    } else {
+                        localStorage.removeItem('isSeller');
+                        navigate('/buyer', { replace: true });
+                    }
+                } catch (err) {
+                    const isSeller = localStorage.getItem('isSeller') === 'true';
+                    navigate(isSeller ? '/seller' : '/buyer', { replace: true });
+                }
             }
         } catch (error) {
             console.error("Firebase Auth Failed:", error);
-            setErrors(prev => ({ ...prev, auth: error.message }));
+            const errorMessages = {
+                'auth/invalid-credential': 'Invalid email or password. Please try again.',
+                'auth/invalid-email': 'Please enter a valid email address.',
+                'auth/user-not-found': 'No account found with this email.',
+                'auth/wrong-password': 'Incorrect password. Please try again.',
+                'auth/email-already-in-use': 'An account with this email already exists.',
+                'auth/weak-password': 'Password is too weak. Use at least 6 characters.',
+                'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
+                'auth/network-request-failed': 'Network error. Check your connection and try again.',
+                'auth/user-disabled': 'This account has been disabled. Contact support.',
+            };
+            const code = error.code || '';
+            const friendlyMessage = errorMessages[code] || 'Authentication failed. Please try again.';
+            setErrors(prev => ({ ...prev, auth: friendlyMessage }));
         } finally {
             setLoading(false);
         }
     };
 
     const handleGoogleSignIn = async () => {
-        const provider = new GoogleAuthProvider();
+        setGoogleLoading(true);
+        setErrors({});
         try {
-            const result = await signInWithPopup(auth, provider);
+            await setPersistence(auth, browserSessionPersistence);
+            const result = await signInWithPopup(auth, googleProvider);
+            const isNewUser = result._tokenResponse?.isNewUser || false;
+
             localStorage.setItem('userName', result.user.displayName || result.user.email.split('@')[0]);
             localStorage.setItem('userEmail', result.user.email);
 
             if (result.user.email === 'admin@verditrust.com') {
-                navigate('/admin');
-            } else {
-                const isSeller = localStorage.getItem('isSeller') === 'true';
-                navigate(isSeller ? '/seller' : '/buyer');
-            }
+                navigate('/admin', { replace: true });
+            } else if (isNewUser) {
+                // New Google users are always buyers — save to Supabase
+                localStorage.removeItem('isSeller');
 
+                const displayName = result.user.displayName || result.user.email.split('@')[0];
+                await supabase.from('users').upsert([{
+                    name: displayName,
+                    email: result.user.email,
+                    role: 'Credit Buyer',
+                    status: 'Active'
+                }], { onConflict: 'email' });
+
+                await supabase.from('notifications').insert([{
+                    title: 'New User Registered',
+                    message: `${displayName} joined as Credit Buyer via Google.`
+                }]);
+
+                navigate('/buyer', { replace: true });
+            } else {
+                try {
+                    // Sync returning Google user into Supabase if not present
+                    const { data: existingGUser } = await supabase
+                        .from('users')
+                        .select('id, role, name')
+                        .eq('email', result.user.email)
+                        .maybeSingle();
+
+                    if (!existingGUser) {
+                        const displayName = result.user.displayName || result.user.email.split('@')[0];
+                        await supabase.from('users').insert([{
+                            name: displayName,
+                            email: result.user.email,
+                            role: 'Credit Buyer',
+                            status: 'Active'
+                        }]);
+                    } else if (existingGUser.name) {
+                        localStorage.setItem('userName', existingGUser.name);
+                    }
+
+                    const roleData = existingGUser || { role: 'Credit Buyer' };
+                    if (roleData.role === 'Project Developer' || roleData.role === 'seller' || localStorage.getItem('isSeller') === 'true') {
+                        localStorage.setItem('isSeller', 'true');
+                        navigate('/seller', { replace: true });
+                    } else {
+                        localStorage.removeItem('isSeller');
+                        navigate('/buyer', { replace: true });
+                    }
+                } catch (err) {
+                    const isSeller = localStorage.getItem('isSeller') === 'true';
+                    navigate(isSeller ? '/seller' : '/buyer', { replace: true });
+                }
+            }
         } catch (error) {
             console.error("Firebase Google Login Failed:", error);
-            alert(`Google Sign-In failed: ${error.message}`);
+            if (error.code !== 'auth/popup-closed-by-user') {
+                setErrors(prev => ({ ...prev, auth: 'Google Sign-In failed. Please try again.' }));
+            }
+        } finally {
+            setGoogleLoading(false);
         }
     };
 
@@ -368,15 +514,25 @@ export function LoginPage() {
                         <button
                             type="button"
                             onClick={handleGoogleSignIn}
-                            className="w-full h-14 rounded-2xl bg-white/5 border border-slate-800 hover:bg-white/10 hover:border-slate-700 text-white font-bold transition-all flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
+                            disabled={googleLoading}
+                            className="w-full h-14 rounded-2xl bg-white/5 border border-slate-800 hover:bg-white/10 hover:border-slate-700 text-white font-bold transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
-                                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                            </svg>
-                            Continue with Google
+                            {googleLoading ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Connecting...
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+                                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                                    </svg>
+                                    Continue with Google
+                                </>
+                            )}
                         </button>
 
                         <div className="text-center mt-10">

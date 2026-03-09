@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { ShieldCheck, Users, AlertCircle, FileText, Settings, BarChart3, Search } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const AdminDashboard = () => {
     const [stats, setStats] = useState({
@@ -16,12 +17,15 @@ const AdminDashboard = () => {
     const fetchData = async () => {
         try {
             const [projectsRes, usersRes] = await Promise.all([
-                fetch('/api/projects'),
-                fetch('/api/users')
+                supabase.from('projects').select('*').order('submitted_at', { ascending: false }),
+                supabase.from('users').select('*').order('joined_at', { ascending: false })
             ]);
 
-            const projects = await projectsRes.json();
-            const users = await usersRes.json();
+            if (projectsRes.error) throw projectsRes.error;
+            if (usersRes.error) throw usersRes.error;
+
+            const projects = projectsRes.data || [];
+            const users = usersRes.data || [];
 
             // Filter for pending/in-review projects
             const pendingProjects = projects.filter(p => p.status === 'Pending' || p.status === 'In Review' || p.status === 'Submitted');
@@ -47,11 +51,8 @@ const AdminDashboard = () => {
 
     const handleApprove = async (id) => {
         try {
-            await fetch(`/api/projects/${id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Approved' })
-            });
+            const { error } = await supabase.from('projects').update({ status: 'Approved' }).eq('id', id);
+            if (error) throw error;
             fetchData();
         } catch (err) {
             console.error(err);

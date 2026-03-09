@@ -35,6 +35,9 @@ import {
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { supabase } from '../lib/supabase';
+
+const SUPABASE_STORAGE_URL = 'https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads';
 
 const StatCard = ({ title, value, change, icon: Icon, trend, color }) => (
     <Card className="border-none glass-morphism hover:scale-[1.02] transition-all duration-500 cursor-default group overflow-hidden">
@@ -83,6 +86,24 @@ const SellerDashboard = () => {
 
     const [listings, setListings] = useState([]);
     const [recentTransactions, setRecentTransactions] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('All');
+
+    const handleFilterCycle = () => {
+        const statuses = ['All', 'Active', 'In Review', 'Sold'];
+        const nextIndex = (statuses.indexOf(statusFilter) + 1) % statuses.length;
+        setStatusFilter(statuses[nextIndex]);
+    };
+
+    const filteredListings = listings.filter(l => {
+        const searchLower = searchQuery.toLowerCase();
+        const typeLower = l.type ? l.type.toLowerCase() : '';
+        const sourceLower = l.project_source ? l.project_source.toLowerCase() : '';
+
+        const matchesSearch = typeLower.includes(searchLower) || sourceLower.includes(searchLower) || l.id.toString().includes(searchLower);
+        const matchesFilter = statusFilter === 'All' || l.status === statusFilter;
+        return matchesSearch && matchesFilter;
+    });
 
     const handleDownloadCSV = (data, fileName) => {
         const dateObj = new Date();
@@ -98,7 +119,7 @@ const SellerDashboard = () => {
 
         csvContent += data.map(l => {
             const price = String(l.price || '').replace(/[₹,]/g, '');
-            const certUrl = l.certificate_file ? `http://localhost:3005/uploads/${l.certificate_file}` : 'N/A';
+            const certUrl = l.certificate_file ? `${SUPABASE_STORAGE_URL}/${l.certificate_file}` : 'N/A';
             return `${l.id},"${l.project_source}","${l.type}",${price},${l.volume},${l.vintage},"${l.status}","${certUrl}"`;
         }).join("\n");
         const encodedUri = encodeURI(csvContent);
@@ -245,27 +266,20 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
     const fetchData = async () => {
         try {
-            const listingsRes = await fetch('/api/listings');
-            const listingsData = await listingsRes.json();
-            if (Array.isArray(listingsData)) {
-                setListings(listingsData);
-            } else {
-                console.error("Listings API error", listingsData);
-            }
+            const { data: listingsData, error: listingsErr } = await supabase
+                .from('listings').select('*').order('created_at', { ascending: false });
+            if (listingsErr) throw listingsErr;
+            setListings(listingsData || []);
 
-            const txRes = await fetch('/api/transactions');
-            const txData = await txRes.json();
-            if (Array.isArray(txData)) {
-                // Map database fields to UI keys
-                const mappedTx = txData.map(tx => ({
-                    ...tx,
-                    buyer: tx.buyer_name,
-                    date: tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : 'Pending'
-                }));
-                setRecentTransactions(mappedTx);
-            } else {
-                console.error("Transactions API error", txData);
-            }
+            const { data: txData, error: txErr } = await supabase
+                .from('transactions').select('*').order('transaction_date', { ascending: false });
+            if (txErr) throw txErr;
+            const mappedTx = (txData || []).map(tx => ({
+                ...tx,
+                buyer: tx.buyer_name,
+                date: tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : 'Pending'
+            }));
+            setRecentTransactions(mappedTx);
         } catch (error) {
             console.error("Failed to fetch data", error);
         }
@@ -291,33 +305,32 @@ Certificate: ${l.certificate_file || 'N/A'}`;
     const handleUpdateListing = async () => {
         if (!validateListing(editingListing)) return;
         try {
-            const formData = new FormData();
-            formData.append('project_source', editingListing.project_source);
-            formData.append('volume', editingListing.volume);
-
-            // Clean price
             const cleanPrice = String(editingListing.price).replace(/[₹,]/g, '').trim();
-            formData.append('price', cleanPrice);
+            let coverImageName = editingListing.cover_image;
 
-            formData.append('type', editingListing.type);
-            formData.append('vintage', editingListing.vintage);
-
+            // Upload new cover image to Supabase Storage if provided
             if (editingListing.cover_image_file) {
-                formData.append('cover_image', editingListing.cover_image_file);
-            } else if (editingListing.cover_image) {
-                formData.append('cover_image', editingListing.cover_image); // Send string if no new file
+                const file = editingListing.cover_image_file;
+                const fileName = `${Date.now()}-${file.name}`;
+                const { error: uploadErr } = await supabase.storage.from('uploads').upload(fileName, file);
+                if (uploadErr) throw uploadErr;
+                coverImageName = fileName;
             }
 
-            const res = await fetch(`/api/listings/${editingListing.id}`, {
-                method: 'PUT',
-                body: formData
-            });
-            if (res.ok) {
-                runAction('Listing updated');
-                setIsEditOpen(false);
-                setCoverImagePreview(null);
-                fetchData();
-            }
+            const { error: updateErr } = await supabase.from('listings').update({
+                project_source: editingListing.project_source,
+                volume: editingListing.volume,
+                price: cleanPrice,
+                type: editingListing.type,
+                vintage: editingListing.vintage,
+                cover_image: coverImageName
+            }).eq('id', editingListing.id);
+
+            if (updateErr) throw updateErr;
+            runAction('Listing updated');
+            setIsEditOpen(false);
+            setCoverImagePreview(null);
+            fetchData();
         } catch (error) {
             console.error("Failed to update listing", error);
         }
@@ -325,15 +338,12 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
     const handleDeleteListing = async () => {
         try {
-            const res = await fetch(`/api/listings/${deletingListing.id}`, {
-                method: 'DELETE'
-            });
-            if (res.ok) {
-                runAction('Listing deleted');
-                setIsDeleteOpen(false);
-                setDeletingListing(null);
-                fetchData();
-            }
+            const { error: deleteErr } = await supabase.from('listings').delete().eq('id', deletingListing.id);
+            if (deleteErr) throw deleteErr;
+            runAction('Listing deleted');
+            setIsDeleteOpen(false);
+            setDeletingListing(null);
+            fetchData();
         } catch (error) {
             console.error("Failed to delete listing", error);
         }
@@ -580,49 +590,64 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                         if (!validateListing(newListing, { certificate_file: uploadedFile, cover_image: coverImage })) return;
 
                                         try {
-                                            const formData = new FormData();
-                                            formData.append('project_source', newListing.project_source);
-                                            formData.append('volume', newListing.volume);
-
                                             const cleanPrice = String(newListing.price).replace(/[₹,]/g, '').trim();
-                                            formData.append('price', cleanPrice);
+                                            let certFileName = null;
+                                            let coverFileName = null;
 
-                                            formData.append('type', newListing.type);
-                                            formData.append('vintage', newListing.vintage);
-
+                                            // Upload certificate to Supabase Storage
                                             if (uploadedFile) {
-                                                formData.append('certificate_file', uploadedFile);
-                                            }
-                                            if (coverImage) {
-                                                formData.append('cover_image', coverImage);
+                                                const certName = `cert-${Date.now()}-${uploadedFile.name}`;
+                                                const { error: certErr } = await supabase.storage.from('uploads').upload(certName, uploadedFile);
+                                                if (certErr) throw certErr;
+                                                certFileName = certName;
                                             }
 
-                                            const res = await fetch('/api/listings', {
-                                                method: 'POST',
-                                                body: formData
-                                            });
-                                            if (res.ok) {
-                                                setIsListingOpen(false);
-                                                setUploadedFile(null);
-                                                setCoverImage(null);
-                                                setCoverImagePreview(null);
-                                                setNewListing({
-                                                    project_source: '',
-                                                    volume: '',
-                                                    price: '',
-                                                    type: 'Nature',
-                                                    vintage: 2024
-                                                });
-                                                setErrors({});
-                                                runAction('Listing creation');
-                                                fetchData();
-                                            } else {
-                                                const errData = await res.json().catch(() => ({}));
-                                                runError(errData.error || 'Failed to publish');
+                                            // Upload cover image to Supabase Storage
+                                            if (coverImage) {
+                                                const coverName = `cover-${Date.now()}-${coverImage.name}`;
+                                                const { error: coverErr } = await supabase.storage.from('uploads').upload(coverName, coverImage);
+                                                if (coverErr) throw coverErr;
+                                                coverFileName = coverName;
                                             }
+
+                                            // Insert listing into Supabase
+                                            const { error: insertErr } = await supabase.from('listings').insert([{
+                                                project_source: newListing.project_source,
+                                                volume: newListing.volume,
+                                                price: cleanPrice,
+                                                type: newListing.type,
+                                                vintage: newListing.vintage,
+                                                status: 'In Review',
+                                                fill_percentage: 0,
+                                                certificate_file: certFileName,
+                                                cover_image: coverFileName
+                                            }]);
+
+                                            if (insertErr) throw insertErr;
+
+                                            // Create notification
+                                            await supabase.from('notifications').insert([{
+                                                title: 'New Verification Required',
+                                                message: `Asset from ${newListing.project_source} requires protocol authorization.`
+                                            }]);
+
+                                            setIsListingOpen(false);
+                                            setUploadedFile(null);
+                                            setCoverImage(null);
+                                            setCoverImagePreview(null);
+                                            setNewListing({
+                                                project_source: '',
+                                                volume: '',
+                                                price: '',
+                                                type: 'Nature',
+                                                vintage: 2024
+                                            });
+                                            setErrors({});
+                                            runAction('Listing creation');
+                                            fetchData();
                                         } catch (error) {
                                             console.error("Publish error:", error);
-                                            runError('Server unreachable');
+                                            runError(error.message || 'Failed to publish');
                                         }
                                     }}
                                 >
@@ -759,7 +784,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                         >
                                             {coverImagePreview || editingListing?.cover_image ? (
                                                 <div className="relative w-full h-full">
-                                                    <img src={coverImagePreview || (editingListing?.cover_image?.startsWith('http') ? editingListing?.cover_image : `http://localhost:3005/uploads/${editingListing?.cover_image}`)} alt="Cover Preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                    <img src={coverImagePreview || (editingListing?.cover_image?.startsWith('http') ? editingListing?.cover_image : `${SUPABASE_STORAGE_URL}/${editingListing?.cover_image}`)} alt="Cover Preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
                                                         <ImageIcon className="w-8 h-8 mb-2" />
                                                         <p className="text-xs font-black uppercase tracking-widest text-center">Swap Presentation<br />Asset</p>
@@ -981,20 +1006,37 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                 variant="ghost"
                                 size="sm"
                                 className="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 gap-3"
-                                onClick={() => handleDownloadCSV(listings, 'market-listings')}
+                                onClick={() => handleDownloadCSV(filteredListings, 'market-listings')}
                             >
                                 <Download className="w-5 h-5 text-emerald-400" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Export All</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest">Export {statusFilter === 'All' ? 'All' : statusFilter}</span>
                             </Button>
                             <div className="relative">
                                 <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                                <input className="h-12 pl-10 pr-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white w-56 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600 flex items-center" placeholder="Search orders..." />
+                                <input
+                                    className="h-12 pl-10 pr-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white w-56 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-600 flex items-center"
+                                    placeholder="Search listings..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400 transition-colors">
+                                        &times;
+                                    </button>
+                                )}
                             </div>
                             <Button variant="ghost" size="sm" onClick={fetchData} className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 mr-2 hover:text-emerald-400 transition-colors" title="Refresh Data">
                                 <RefreshCw className="w-5 h-5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400">
-                                <Filter className="w-5 h-5" />
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleFilterCycle}
+                                className={`h-12 px-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${statusFilter !== 'All' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'}`}
+                                title={`Filter: ${statusFilter}`}
+                            >
+                                <Filter className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">{statusFilter}</span>
                             </Button>
                         </div>
                     </CardHeader>
@@ -1031,110 +1073,118 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
-                                    {listings.map((item, i) => (
-                                        <tr key={i} className="group hover:bg-white/[0.02] transition-colors cursor-default">
-                                            <td className="px-8 py-8">
-                                                <span className="text-xs font-mono font-black text-slate-500 bg-white/5 px-2 py-1 rounded-md">CRT-{item.id}</span>
-                                            </td>
-                                            <td className="px-4 py-8">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
-                                                        <Leaf className="w-5 h-5 text-emerald-400" />
-                                                    </div>
-                                                    <div className="truncate">
-                                                        <p className="text-sm font-black text-white truncate">{item.project_source}</p>
-                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{item.type}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            <td className="px-4 py-8">
-                                                <p className="text-sm font-black text-white">₹{Number(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-                                                <p className="text-[10px] text-emerald-500 font-bold mt-1.5 uppercase tracking-widest">Market Spot</p>
-                                            </td>
-                                            <td className="px-4 py-8">
-                                                <div className="flex flex-col gap-2.5">
-                                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                                        <span className={item.status === 'Sold Out' ? 'text-rose-400' : item.status === 'In Review' ? 'text-amber-400' : 'text-emerald-400'}>
-                                                            {item.status === 'Active' ? 'Verified' : item.status === 'In Review' ? 'Under Protocol' : item.status}
-                                                        </span>
-                                                        <span className="text-slate-500">{item.fill_percentage}%</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full transition-all duration-[1500ms] ${item.status === 'Sold Out' ? 'bg-rose-500' : item.status === 'In Review' ? 'bg-amber-500' : 'bg-emerald-500'
-                                                                } shadow-[0_0_10px_rgba(16,185,129,0.3)]`}
-                                                            style={{ width: `${item.status === 'In Review' ? 5 : item.fill_percentage}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-8 py-8 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <div className="relative">
-                                                        <Button
-                                                            variant="ghost"
-                                                            className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center flex-shrink-0"
-                                                            onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
-                                                        >
-                                                            <MoreVertical className="w-4 h-4 text-slate-500" />
-                                                        </Button>
-                                                        {openMenuId === item.id && (
-                                                            <div className="absolute right-0 mt-3 w-48 glass-morphism-heavy rounded-[1.25rem] shadow-2xl border border-white/10 py-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-3xl">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        handleEditListing(item);
-                                                                        setOpenMenuId(null);
-                                                                    }}
-                                                                    className="w-full px-5 py-3 text-left text-xs font-black text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-3 transition-all"
-                                                                >
-                                                                    <Edit2 className="w-4 h-4 text-emerald-400" />
-                                                                    Modify Asset
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setDeletingListing(item);
-                                                                        setIsDeleteOpen(true);
-                                                                        setOpenMenuId(null);
-                                                                    }}
-                                                                    className="w-full px-5 py-3 text-left text-xs font-black text-rose-400 hover:bg-rose-500/10 flex items-center gap-3 transition-all"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                    Liquidate Listing
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-slate-500 transition-all flex items-center justify-center flex-shrink-0"
-                                                        onClick={() => handleDownloadSingle(item)}
-                                                        title="Download Details"
-                                                    >
-                                                        <Download className="w-4 h-4" />
-                                                    </Button>
-                                                    {item.certificate_file && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-blue-500/10 hover:text-blue-400 text-slate-500 transition-all flex items-center justify-center flex-shrink-0"
-                                                            onClick={() => {
-                                                                const link = document.createElement('a');
-                                                                link.href = `http://localhost:3005/uploads/${item.certificate_file}`;
-                                                                link.download = item.certificate_file;
-                                                                link.target = "_blank";
-                                                                document.body.appendChild(link);
-                                                                link.click();
-                                                                document.body.removeChild(link);
-                                                            }}
-                                                            title="Download Certificate"
-                                                        >
-                                                            <FileText className="w-4 h-4" />
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                    {filteredListings.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="px-8 py-16 text-center">
+                                                <div className="text-slate-500 font-medium">No listings found matching your criteria.</div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        filteredListings.map((item, i) => (
+                                            <tr key={i} className="group hover:bg-white/[0.02] transition-colors cursor-default">
+                                                <td className="px-8 py-8">
+                                                    <span className="text-xs font-mono font-black text-slate-500 bg-white/5 px-2 py-1 rounded-md">CRT-{item.id}</span>
+                                                </td>
+                                                <td className="px-4 py-8">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
+                                                            <Leaf className="w-5 h-5 text-emerald-400" />
+                                                        </div>
+                                                        <div className="truncate">
+                                                            <p className="text-sm font-black text-white truncate">{item.project_source}</p>
+                                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{item.type}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-4 py-8">
+                                                    <p className="text-sm font-black text-white">₹{Number(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                                                    <p className="text-[10px] text-emerald-500 font-bold mt-1.5 uppercase tracking-widest">Market Spot</p>
+                                                </td>
+                                                <td className="px-4 py-8">
+                                                    <div className="flex flex-col gap-2.5">
+                                                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                                            <span className={item.status === 'Sold Out' ? 'text-rose-400' : item.status === 'In Review' ? 'text-amber-400' : 'text-emerald-400'}>
+                                                                {item.status === 'Active' ? 'Verified' : item.status === 'In Review' ? 'Under Protocol' : item.status}
+                                                            </span>
+                                                            <span className="text-slate-500">{item.fill_percentage}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full transition-all duration-[1500ms] ${item.status === 'Sold Out' ? 'bg-rose-500' : item.status === 'In Review' ? 'bg-amber-500' : 'bg-emerald-500'
+                                                                    } shadow-[0_0_10px_rgba(16,185,129,0.3)]`}
+                                                                style={{ width: `${item.status === 'In Review' ? 5 : item.fill_percentage}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-8 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <div className="relative">
+                                                            <Button
+                                                                variant="ghost"
+                                                                className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center flex-shrink-0"
+                                                                onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                                                            >
+                                                                <MoreVertical className="w-4 h-4 text-slate-500" />
+                                                            </Button>
+                                                            {openMenuId === item.id && (
+                                                                <div className="absolute right-0 mt-3 w-48 glass-morphism-heavy rounded-[1.25rem] shadow-2xl border border-white/10 py-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-3xl">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            handleEditListing(item);
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className="w-full px-5 py-3 text-left text-xs font-black text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-3 transition-all"
+                                                                    >
+                                                                        <Edit2 className="w-4 h-4 text-emerald-400" />
+                                                                        Modify Asset
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setDeletingListing(item);
+                                                                            setIsDeleteOpen(true);
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className="w-full px-5 py-3 text-left text-xs font-black text-rose-400 hover:bg-rose-500/10 flex items-center gap-3 transition-all"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                        Liquidate Listing
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-slate-500 transition-all flex items-center justify-center flex-shrink-0"
+                                                            onClick={() => handleDownloadSingle(item)}
+                                                            title="Download Details"
+                                                        >
+                                                            <Download className="w-4 h-4" />
+                                                        </Button>
+                                                        {item.certificate_file && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                className="h-10 w-10 p-0 rounded-2xl bg-white/5 border border-white/5 hover:bg-blue-500/10 hover:text-blue-400 text-slate-500 transition-all flex items-center justify-center flex-shrink-0"
+                                                                onClick={() => {
+                                                                    const link = document.createElement('a');
+                                                                    link.href = `${SUPABASE_STORAGE_URL}/${item.certificate_file}`;
+                                                                    link.download = item.certificate_file;
+                                                                    link.target = "_blank";
+                                                                    document.body.appendChild(link);
+                                                                    link.click();
+                                                                    document.body.removeChild(link);
+                                                                }}
+                                                                title="Download Certificate"
+                                                            >
+                                                                <FileText className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -1276,7 +1326,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                         <CardDescription className="text-slate-500 font-medium">Verified customer procurement</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="divide-y divide-white/5">
+                        <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto scrollbar-hide">
                             {recentTransactions.length === 0 ? (
                                 <div className="p-8 text-center">
                                     <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -1287,26 +1337,24 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                 </div>
                             ) : (
                                 recentTransactions.map((tx, i) => (
-                                    <div key={i} className="p-8 hover:bg-white/[0.03] transition-colors cursor-pointer group border-b border-white/5 last:border-none" onClick={() => runAction(`View settlement ${tx.id}`)}>
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div>
-                                                <p className="text-sm font-black text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{tx.buyer}</p>
-                                                <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mt-1.5">{tx.date}</p>
-                                            </div>
-                                            <ExternalLink className="w-4 h-4 text-slate-700 group-hover:text-cyan-400 transition-colors" />
+                                    <div key={i} className="px-6 py-4 hover:bg-white/[0.03] transition-colors cursor-pointer group border-b border-white/5 last:border-none" onClick={() => runAction(`View settlement ${tx.id}`)}>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <p className="text-xs font-black text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{tx.buyer}</p>
+                                            <ExternalLink className="w-3.5 h-3.5 text-slate-700 group-hover:text-cyan-400 transition-colors" />
                                         </div>
-                                        <div className="flex justify-between items-end">
-                                            <div>
-                                                <p className="text-[11px] font-black text-slate-500 mb-1">{Number(tx.credits).toLocaleString('en-IN')} tCO2e</p>
-                                                <p className="text-2xl font-black text-cyan-400 tracking-tight leading-none">₹{Number(tx.amount).toLocaleString('en-IN')}</p>
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3">
+                                                <p className="text-base font-black text-cyan-400 tracking-tight leading-none">₹{Number(tx.amount).toLocaleString('en-IN')}</p>
+                                                <span className="text-[10px] font-bold text-slate-600">{Number(tx.credits).toLocaleString('en-IN')} tCO2e</span>
                                             </div>
-                                            <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] border transition-all ${tx.status === 'Completed' || tx.status === 'Active'
-                                                ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10 group-hover:bg-emerald-500/10'
-                                                : 'bg-amber-500/5 text-amber-500 border-amber-500/10 group-hover:bg-amber-500/10'
+                                            <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${tx.status === 'Completed' || tx.status === 'Active'
+                                                ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10'
+                                                : 'bg-amber-500/5 text-amber-500 border-amber-500/10'
                                                 }`}>
                                                 {tx.status === 'Completed' || tx.status === 'Active' ? 'Completed' : tx.status}
                                             </div>
                                         </div>
+                                        <p className="text-[10px] font-bold text-slate-600 mt-1.5">{tx.date}</p>
                                     </div>
                                 ))
                             )}

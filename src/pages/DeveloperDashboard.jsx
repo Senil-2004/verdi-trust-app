@@ -22,6 +22,9 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { supabase } from '../lib/supabase';
+
+const SUPABASE_STORAGE_URL = 'https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads';
 
 const StatCard = ({ title, value, change, icon: Icon, trend }) => (
     <Card className="border-none glass-morphism hover:scale-[1.02] transition-all duration-500 cursor-default group overflow-hidden">
@@ -68,7 +71,7 @@ const DeveloperDashboard = () => {
         csvContent += data.map(l => {
             const price = String(l.price || '').replace(/,/g, '');
             const volume = String(l.volume || '').replace(/,/g, '');
-            const certUrl = l.certificate_file ? `http://localhost:3005/uploads/${l.certificate_file}` : 'N/A';
+            const certUrl = l.certificate_file ? `${SUPABASE_STORAGE_URL}/${l.certificate_file}` : 'N/A';
             return `${l.id},"${l.project_source || l.name}","${l.type || 'N/A'}",${price},${volume},${l.vintage || 'N/A'},"${l.status}","${certUrl}"`;
         }).join("\n");
         const encodedUri = encodeURI(csvContent);
@@ -113,8 +116,8 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
     const fetchAllData = async () => {
         try {
-            const res = await fetch('/api/listings');
-            const data = await res.json();
+            const { data, error } = await supabase.from('listings').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
 
             if (Array.isArray(data)) {
                 // Map database listings to the activity feed
@@ -139,8 +142,6 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                 // Extract listings for the registry
                 setReviewListings(data.filter(l => l.status === 'In Review'));
                 setIssuanceHistory(data);
-            } else {
-                console.error("API returned non-array:", data);
             }
         } catch (err) {
             console.error("Dashboard sync error:", err);
@@ -153,15 +154,19 @@ Certificate: ${l.certificate_file || 'N/A'}`;
 
     const handleVerify = async (id, status) => {
         try {
-            const res = await fetch(`/api/listings/${id}/verify`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
-            if (res.ok) {
-                runAction(status === 'Active' ? 'verify' : 'reject', `Listing ${status === 'Active' ? 'Approved' : 'Rejected'}`);
-                await fetchAllData(); // Dynamic refresh instead of full reload
+            const { error } = await supabase.from('listings').update({ status }).eq('id', id);
+            if (error) throw error;
+
+            const listing = projects.find(p => p.id === id);
+            if (listing) {
+                await supabase.from('notifications').insert([{
+                    title: `Listing ${status === 'Active' ? 'Approved' : 'Rejected'}`,
+                    message: `Asset from ${listing.name} has been ${status === 'Active' ? 'approved' : 'rejected'}.`
+                }]);
             }
+
+            runAction(status === 'Active' ? 'verify' : 'reject', `Listing ${status === 'Active' ? 'Approved' : 'Rejected'}`);
+            await fetchAllData();
         } catch (err) {
             console.error(err);
         }
@@ -388,7 +393,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                                                 <div className="relative w-16 h-12 rounded-xl border border-white/10 overflow-hidden bg-white/5 flex-shrink-0">
                                                     {l.cover_image ? (
                                                         <img
-                                                            src={l.cover_image?.startsWith('http') ? l.cover_image : `http://localhost:3005/uploads/${l.cover_image}`}
+                                                            src={l.cover_image?.startsWith('http') ? l.cover_image : `${SUPABASE_STORAGE_URL}/${l.cover_image}`}
                                                             onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80'; }}
                                                             alt=""
                                                             className="w-full h-full object-cover"

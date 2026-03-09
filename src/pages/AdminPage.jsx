@@ -25,6 +25,7 @@ import {
     DialogFooter
 } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
+import { supabase } from '../lib/supabase';
 
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('overview');
@@ -37,17 +38,17 @@ const AdminPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const usersRes = await fetch('/api/users');
-                const usersData = await usersRes.json();
-                setUsers(usersData.map(u => ({
+                const { data: usersData, error: usersErr } = await supabase.from('users').select('*').order('joined_at', { ascending: false });
+                if (usersErr) throw usersErr;
+                setUsers((usersData || []).map(u => ({
                     ...u,
                     id: '#' + u.id,
                     date: new Date(u.joined_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
                 })));
 
-                const projectsRes = await fetch('/api/projects');
-                const projectsData = await projectsRes.json();
-                setProjects(projectsData.map(p => ({
+                const { data: projectsData, error: projErr } = await supabase.from('projects').select('*').order('submitted_at', { ascending: false });
+                if (projErr) throw projErr;
+                setProjects((projectsData || []).map(p => ({
                     ...p,
                     dev: p.developer,
                     date: new Date(p.submitted_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -77,18 +78,18 @@ const AdminPage = () => {
     const handleAddUser = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newUser)
-            });
-            if (res.ok) {
-                const created = await res.json();
-                const date = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
-                setUsers([...users, { ...created, id: '#' + created.id, date }]);
-                setNewUser({ name: '', email: '', role: 'Project Developer' });
-                setIsAddUserOpen(false);
-            }
+            const { data: created, error } = await supabase.from('users').insert([newUser]).select().single();
+            if (error) throw error;
+
+            await supabase.from('notifications').insert([{
+                title: 'New User Registered',
+                message: `User ${newUser.name} joined as ${newUser.role}.`
+            }]);
+
+            const date = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+            setUsers([{ ...created, id: '#' + created.id, date }, ...users]);
+            setNewUser({ name: '', email: '', role: 'Project Developer' });
+            setIsAddUserOpen(false);
         } catch (err) {
             console.error(err);
         }
@@ -97,7 +98,8 @@ const AdminPage = () => {
     const deleteUser = async (id) => {
         try {
             const realId = id.replace('#', '');
-            await fetch(`/api/users/${realId}`, { method: 'DELETE' });
+            const { error } = await supabase.from('users').delete().eq('id', realId);
+            if (error) throw error;
             setUsers(users.filter(u => u.id !== id));
         } catch (err) {
             console.error(err);
@@ -106,11 +108,17 @@ const AdminPage = () => {
 
     const updateProjectStatus = async (id, status) => {
         try {
-            await fetch(`/api/projects/${id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
+            const { error } = await supabase.from('projects').update({ status }).eq('id', id);
+            if (error) throw error;
+
+            const proj = projects.find(p => p.id === id);
+            if (proj) {
+                await supabase.from('notifications').insert([{
+                    title: `Listing ${status}`,
+                    message: `Asset from ${proj.developer} has been ${status.toLowerCase()}.`
+                }]);
+            }
+
             setProjects(projects.map(p => {
                 if (p.id === id) {
                     let statusColor = 'text-slate-400 bg-slate-500/10 border-slate-500/20';
