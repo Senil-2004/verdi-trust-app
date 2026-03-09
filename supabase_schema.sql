@@ -85,11 +85,11 @@ CREATE TABLE IF NOT EXISTS system_settings (
     id INT PRIMARY KEY DEFAULT 1,
     platform_fee DECIMAL(10, 2) DEFAULT 2.5,
     verification_timeout INT DEFAULT 48,
-    maintenance_mode BOOLEAN DEFAULT FALSE,
+    is_hosted BOOLEAN DEFAULT TRUE,
     two_factor_required BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO system_settings (id, platform_fee, verification_timeout, maintenance_mode, two_factor_required)
-VALUES (1, 2.5, 48, FALSE, TRUE)
+INSERT INTO system_settings (id, platform_fee, verification_timeout, is_hosted, two_factor_required)
+VALUES (1, 2.5, 48, TRUE, TRUE)
 ON CONFLICT (id) DO NOTHING;

@@ -66,14 +66,14 @@ const AdminPage = () => {
 
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [newUser, setNewUser] = useState({ name: '', email: '', role: 'Project Developer' });
-    const [showSaveToast, setShowSaveToast] = useState(false);
 
     // Settings State
     const [platformFee, setPlatformFee] = useState(2.5);
     const [verificationTimeout, setVerificationTimeout] = useState(48);
+    const [isHosted, setIsHosted] = useState(true);
     const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
-    const [isAuditLogsOpen, setIsAuditLogsOpen] = useState(false);
+    const [showSaveToast, setShowSaveToast] = useState(false);
 
     const handleAddUser = async (e) => {
         e.preventDefault();
@@ -117,7 +117,7 @@ const AdminPage = () => {
                 if (data) {
                     setPlatformFee(data.platform_fee || 2.5);
                     setVerificationTimeout(data.verification_timeout || 48);
-                    setMaintenanceMode(data.maintenance_mode || false);
+                    setIsHosted(data.is_hosted ?? true);
                     setTwoFactorEnabled(data.two_factor_required || true);
                 }
             } catch (err) {
@@ -134,7 +134,7 @@ const AdminPage = () => {
                 id: 1, // Fixed ID for global settings
                 platform_fee: platformFee,
                 verification_timeout: verificationTimeout,
-                maintenance_mode: maintenanceMode,
+                is_hosted: isHosted,
                 two_factor_required: twoFactorEnabled,
                 updated_at: new Date().toISOString()
             });
@@ -570,14 +570,14 @@ const AdminPage = () => {
                                 </div>
                                 <div className="flex items-center justify-between p-5 bg-white/5 rounded-2xl border border-white/5">
                                     <div>
-                                        <p className="text-sm font-black text-white uppercase tracking-wider">Maintenance Mode</p>
-                                        <p className="text-xs text-slate-500 mt-1">Disable project submissions</p>
+                                        <p className="text-sm font-black text-white uppercase tracking-wider">Global Hosting Status</p>
+                                        <p className="text-xs text-slate-500 mt-1">{isHosted ? 'Platform is online' : 'System is currently hidden'}</p>
                                     </div>
                                     <button
-                                        onClick={() => setMaintenanceMode(!maintenanceMode)}
-                                        className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${maintenanceMode ? 'bg-amber-500' : 'bg-slate-700'}`}
+                                        onClick={() => setIsHosted(!isHosted)}
+                                        className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${isHosted ? 'bg-emerald-500' : 'bg-rose-500/30'}`}
                                     >
-                                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${maintenanceMode ? 'left-6' : 'left-1'}`} />
+                                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${isHosted ? 'left-6' : 'left-1'}`} />
                                     </button>
                                 </div>
                                 <Button
