@@ -67,7 +67,7 @@ INSERT INTO users (name, email, role, status, joined_at) VALUES
 ('Sarah Connor', 'sarah@resistance.com', 'Project Developer', 'Active', '2026-01-12'),
 ('Marcus Wright', 'marcus@cyberdyne.io', 'Credit Buyer', 'Pending', '2026-01-13'),
 ('Kyle Reese', 'kyle@techcomm.org', 'Admin', 'Active', '2026-01-10'),
-('John Doe', 'john@verditrust.com', 'Platform Admin', 'Active', '2025-12-15');
+('Admin User', 'admin@gmail.com', 'Admin', 'Active', '2025-12-15');
 
 INSERT INTO projects (name, region, status, developer, submitted_at) VALUES
 ('Amazon Rainforest Reforestation', 'Brazil', 'Pending', 'GreenEarth Co', '2026-01-12'),

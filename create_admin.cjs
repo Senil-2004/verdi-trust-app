@@ -1,13 +1,13 @@
 /**
- * Creates the admin Firebase account: admin@verditrust.com
+ * Creates the admin Firebase account: admin@gmail.com
  * Run once: node create_admin.cjs
  */
 
 const https = require('https');
 
 const API_KEY = 'AIzaSyAdAvjyDiSDKs3J-z36u7sb6mC-ATXPdAs';
-const ADMIN_EMAIL = 'admin@verditrust.com';
-const ADMIN_PASSWORD = 'Admin@Verdi2026';
+const ADMIN_EMAIL = 'admin@gmail.com';
+const ADMIN_PASSWORD = 'admin123';
 
 function post(url, body) {
     return new Promise((resolve, reject) => {

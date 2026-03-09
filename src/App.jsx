@@ -28,7 +28,7 @@ const HostingGuard = () => {
   const [isHosted, setIsHosted] = useState(true);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
-  const isAdmin = localStorage.getItem('userEmail') === 'admin@verditrust.com';
+  const isAdmin = localStorage.getItem('userEmail') === 'admin@gmail.com';
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -48,8 +48,11 @@ const HostingGuard = () => {
 
   if (loading) return <PageLoader />;
 
+  // allow access to login and forgot-password even when site is down so admins can log in
+  const isAuthPath = location.pathname.includes('/login') || location.pathname.includes('/forgot-password');
+
   // Only allow Admin to bypass the maintenance wall
-  if (!isHosted && !isAdmin && !location.pathname.includes('/admin')) {
+  if (!isHosted && !isAdmin && !location.pathname.includes('/admin') && !isAuthPath) {
     return <Maintenance />;
   }
 

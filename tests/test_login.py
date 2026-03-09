@@ -23,8 +23,8 @@ BASE_URL = "http://localhost:5173"
 # Update these with real Firebase credentials
 VALID_BUYER_EMAIL    = "senilcyriac@gmail.com"
 VALID_BUYER_PASSWORD = "senil@2004"
-ADMIN_EMAIL          = "admin@verditrust.com"
-ADMIN_PASSWORD       = "admin@123"
+ADMIN_EMAIL          = "admin@gmail.com"
+ADMIN_PASSWORD       = "admin123"
 
 WRONG_PASSWORD       = "definitelyWrongPass999"
 NEW_USER_NAME        = "Selenium Tester"

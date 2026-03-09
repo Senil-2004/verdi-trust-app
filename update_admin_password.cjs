@@ -1,14 +1,14 @@
 /**
- * Updates the admin Firebase account password: admin@verditrust.com -> admin@123
+ * Updates the admin Firebase account password: admin@gmail.com -> admin123
  * By signing in first to get an ID token.
  */
 
 const https = require('https');
 
 const API_KEY = 'AIzaSyAdAvjyDiSDKs3J-z36u7sb6mC-ATXPdAs';
-const ADMIN_EMAIL = 'admin@verditrust.com';
-const OLD_PASSWORD = 'Admin@Verdi2026';
-const NEW_PASSWORD = 'admin@123';
+const ADMIN_EMAIL = 'admin@gmail.com';
+const OLD_PASSWORD = 'admin123';
+const NEW_PASSWORD = 'admin123'; // Can be changed here
 
 function post(url, body) {
     return new Promise((resolve, reject) => {

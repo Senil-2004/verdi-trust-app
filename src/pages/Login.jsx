@@ -172,7 +172,7 @@ export function LoginPage() {
                 localStorage.setItem('userEmail', user.email);
 
                 // Admin override
-                if (user.email === 'admin@verditrust.com') {
+                if (user.email === 'admin@gmail.com') {
                     navigate('/admin', { replace: true });
                     return;
                 }
@@ -232,7 +232,7 @@ export function LoginPage() {
             localStorage.setItem('userName', displayName);
             localStorage.setItem('userEmail', email);
 
-            if (email === 'admin@verditrust.com') {
+            if (email === 'admin@gmail.com') {
                 navigate('/admin', { replace: true });
                 return;
             }

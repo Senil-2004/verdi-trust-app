@@ -12,7 +12,7 @@ const supabase = createClient(
 async function main() {
     const { error } = await supabase.from('users').upsert([{
         name: 'Platform Admin',
-        email: 'admin@verditrust.com',
+        email: 'admin@gmail.com',
         role: 'Admin',
         status: 'Active'
     }], { onConflict: 'email' });
