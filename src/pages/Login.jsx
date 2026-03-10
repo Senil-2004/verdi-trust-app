@@ -145,6 +145,13 @@ export function LoginPage() {
 
                 localStorage.setItem('userName', formData.name);
                 localStorage.setItem('userEmail', formData.email);
+
+                // Admin override just in case
+                if ((formData.email || '').toLowerCase().trim() === 'admin@gmail.com') {
+                    navigate('/admin', { replace: true });
+                    return;
+                }
+
                 navigate('/buyer', { replace: true });
             } else {
                 // Login optimization: Start Firebase Auth and Supabase fetch in parallel
@@ -172,7 +179,7 @@ export function LoginPage() {
                 localStorage.setItem('userEmail', user.email);
 
                 // Admin override
-                if (user.email === 'admin@gmail.com') {
+                if ((user.email || '').toLowerCase().trim() === 'admin@gmail.com') {
                     navigate('/admin', { replace: true });
                     return;
                 }
@@ -232,7 +239,7 @@ export function LoginPage() {
             localStorage.setItem('userName', displayName);
             localStorage.setItem('userEmail', email);
 
-            if (email === 'admin@gmail.com') {
+            if ((email || '').toLowerCase().trim() === 'admin@gmail.com') {
                 navigate('/admin', { replace: true });
                 return;
             }

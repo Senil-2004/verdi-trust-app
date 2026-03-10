@@ -28,7 +28,7 @@ const HostingGuard = () => {
   const [isHosted, setIsHosted] = useState(true);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
-  const isAdmin = localStorage.getItem('userEmail') === 'admin@gmail.com';
+  const isAdmin = (localStorage.getItem('userEmail') || '').toLowerCase().trim() === 'admin@gmail.com';
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -62,7 +62,9 @@ const HostingGuard = () => {
 // Strict Role Guard component
 const RoleGuard = () => {
   const location = useLocation();
-  const isAdmin = localStorage.getItem('userEmail') === 'admin@gmail.com';
+  const userEmail = localStorage.getItem('userEmail') || '';
+  const isAdmin = userEmail.toLowerCase().trim() === 'admin@gmail.com';
+
 
   if (location.pathname.includes('/admin') && !isAdmin) {
     const isSeller = localStorage.getItem('isSeller') === 'true';
