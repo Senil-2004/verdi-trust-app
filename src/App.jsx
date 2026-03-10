@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, useLocation, Navigate } from 'react-router-dom';
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import { LoginPage } from './pages/Login';
@@ -59,7 +59,26 @@ const HostingGuard = () => {
   return <Outlet />;
 };
 
+// Strict Role Guard component
+const RoleGuard = () => {
+  const location = useLocation();
+  const isAdmin = localStorage.getItem('userEmail') === 'admin@gmail.com';
+
+  if (location.pathname.includes('/admin') && !isAdmin) {
+    const isSeller = localStorage.getItem('isSeller') === 'true';
+    return <Navigate to={isSeller ? "/seller" : "/buyer"} replace />;
+  }
+
+  if (!location.pathname.includes('/admin') && isAdmin) {
+    // Admin trying to access non-admin dashboard
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <Outlet />;
+};
+
 function App() {
+
   return (
     <Router>
       <Suspense fallback={<PageLoader />}>
@@ -75,13 +94,15 @@ function App() {
             </Route>
 
             <Route element={<DashboardLayout />}>
-              <Route path="/developer" element={<DeveloperDashboard />} />
-              <Route path="/project-developer" element={<DeveloperDashboard />} />
-              <Route path="/verifier" element={<DeveloperDashboard />} />
-              <Route path="/buyer" element={<BuyerDashboard />} />
-              <Route path="/seller-onboarding" element={<SellerOnboarding />} />
-              <Route path="/seller" element={<SellerDashboard />} />
-              <Route path="/admin" element={<AdminPage />} />
+              <Route element={<RoleGuard />}>
+                <Route path="/developer" element={<DeveloperDashboard />} />
+                <Route path="/project-developer" element={<DeveloperDashboard />} />
+                <Route path="/verifier" element={<DeveloperDashboard />} />
+                <Route path="/buyer" element={<BuyerDashboard />} />
+                <Route path="/seller-onboarding" element={<SellerOnboarding />} />
+                <Route path="/seller" element={<SellerDashboard />} />
+                <Route path="/admin" element={<AdminPage />} />
+              </Route>
             </Route>
           </Route>
         </Routes>
