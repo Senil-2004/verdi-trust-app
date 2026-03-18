@@ -33,9 +33,9 @@ const Hero = () => (
                 <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] text-emerald-400">CCTS INDIA COMPLIANT</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black leading-[1.05] tracking-tighter mb-6 sm:mb-10 animate-reveal-up delay-200 text-white drop-shadow-2xl">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight sm:leading-none tracking-tighter mb-6 sm:mb-10 text-white drop-shadow-2xl">
                 Scaling Trust <br className="hidden sm:block" />
-                <span className="italic opacity-80 text-emerald-400">in the Future.</span>
+                <span className="text-emerald-400">in the Future.</span>
             </h1>
 
             <p className="text-base sm:text-lg md:text-xl text-white/70 max-w-4xl mx-auto leading-relaxed font-medium mb-10 sm:mb-16 opacity-0 animate-reveal-up delay-400 px-4">
