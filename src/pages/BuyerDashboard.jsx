@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { ShoppingCart, Award, Globe, LineChart, Search, Filter, ArrowUpRight, CheckCircle2, TrendingUp, Download, Leaf, ShieldCheck, Calendar, Zap, Info, CreditCard, Lock, Wallet, FileText, Store, ArrowRight } from 'lucide-react';
+import { ShoppingCart, Award, Globe, LineChart, Search, Filter, ArrowUpRight, CheckCircle2, TrendingUp, Download, Leaf, ShieldCheck, Calendar, Zap, Info, CreditCard, Lock, Wallet, FileText, Store, ArrowRight, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -113,7 +113,7 @@ const BuyerDashboard = () => {
                 rating: "AAA",
                 // Provide Supabase storage URLs instead of localhost later. For now keep images working.
                 img: item.cover_image
-                    ? (item.cover_image.startsWith('http') ? item.cover_image : `https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads/${item.cover_image}`)
+                    ? (item.cover_image.startsWith('http') ? item.cover_image : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/uploads/${item.cover_image}`)
                     : (item.project_source.includes('Amazon') ? 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80' :
                         item.project_source.includes('Wind') ? 'https://images.unsplash.com/photo-1532601224476-15c79f2f7a51?auto=format&fit=crop&w=1200&q=80' :
                             'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80'),
@@ -211,7 +211,7 @@ const BuyerDashboard = () => {
         csvContent += `"Day","${dayStr}"\n\n`;
         csvContent += headers.join(",") + "\n";
         csvContent += data.map(p => {
-            const certUrl = p.certificate_file ? `https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads/${p.certificate_file}` : 'N/A';
+            const certUrl = p.certificate_file ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/uploads/${p.certificate_file}` : 'N/A';
             return `"${p.title || p.name}","${p.origin || 'N/A'}",${String(p.price || '').replace(/[₹,]/g, '')},${p.vintage || 'N/A'},"${p.standard || 'N/A'}","${p.volume || 'N/A'}","${p.status}","${certUrl}"`;
         }).join("\n");
         const encodedUri = encodeURI(csvContent);
@@ -273,7 +273,7 @@ const BuyerDashboard = () => {
                                 <div className="pt-6 border-t border-white/5">
                                     <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-3">Verification Artifacts</h4>
                                     <a
-                                        href={`https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads/${selectedProject.certificate_file}`}
+                                        href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/uploads/${selectedProject.certificate_file}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         download
@@ -394,7 +394,18 @@ const BuyerDashboard = () => {
 
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 relative">
                 <div className="absolute top-[-20px] left-[-20px] w-24 h-24 bg-emerald-500/10 rounded-full blur-[60px] -z-10" />
-
+                <div>
+                    <h1 className="text-4xl font-black text-white tracking-tight mb-2">My Portfolio</h1>
+                    <p className="text-slate-400 font-medium">Manage your verified carbon asset portfolio.</p>
+                </div>
+                {localStorage.getItem('isSeller') !== 'true' && (
+                    <Button 
+                        onClick={() => navigate('/seller-onboarding')}
+                        className="h-12 px-6 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-white font-bold tracking-widest uppercase text-[11px] transition-all shadow-xl hover:shadow-emerald-500/10"
+                    >
+                        Become a Seller
+                    </Button>
+                )}
             </header>
 
             {error && (
@@ -483,14 +494,14 @@ const BuyerDashboard = () => {
             </section>
 
             <Card id="analytics" className="border-none glass-morphism rounded-[4rem] overflow-hidden mt-12 bg-transparent">
-                <CardHeader className="flex flex-col md:flex-row md:items-center justify-between p-16 pb-0">
+                <CardHeader className="flex flex-col md:flex-row md:items-center justify-between p-8 sm:p-16 pb-0">
                     <div>
-                        <CardTitle className="text-5xl font-black text-white tracking-tight">Carbon Trajectory.</CardTitle>
-                        <CardDescription className="text-slate-500 font-medium text-lg mt-4">Verified institutional offset volume (Metric Tons)</CardDescription>
+                        <CardTitle className="text-3xl sm:text-5xl font-black text-white tracking-tight">Carbon Trajectory.</CardTitle>
+                        <CardDescription className="text-slate-500 font-medium text-base sm:text-lg mt-4">Verified institutional offset volume (Metric Tons)</CardDescription>
                     </div>
                 </CardHeader>
-                <CardContent className="p-16">
-                    <div className="h-80 flex items-end gap-5">
+                <CardContent className="p-8 sm:p-16">
+                    <div className="h-80 flex items-end gap-2 sm:gap-5">
                         {monthlyData.map((data, i) => (
                             <div key={i} className="flex-1 group relative h-full">
                                 <div className="w-full bg-white/5 rounded-3xl absolute bottom-0 h-full border border-white/5 group-hover:bg-white/10 transition-all" />
@@ -513,50 +524,48 @@ const BuyerDashboard = () => {
             </Card>
 
             {/* Become a Seller CTA */}
-            {localStorage.getItem('isSeller') !== 'true' && (
-                <div className="relative overflow-hidden rounded-[3rem] mt-12 group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 via-teal-600/10 to-cyan-600/20 group-hover:from-emerald-600/30 group-hover:via-teal-600/20 group-hover:to-cyan-600/30 transition-all duration-700" />
-                    <div className="absolute top-[-50%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px] group-hover:scale-150 transition-transform duration-1000" />
-                    <div className="absolute bottom-[-30%] left-[-10%] w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-[80px] group-hover:scale-125 transition-transform duration-1000" />
+            <div className="relative overflow-hidden rounded-[3rem] mt-12 group">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 via-teal-600/10 to-cyan-600/20 group-hover:from-emerald-600/30 group-hover:via-teal-600/20 group-hover:to-cyan-600/30 transition-all duration-700" />
+                <div className="absolute top-[-50%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px] group-hover:scale-150 transition-transform duration-1000" />
+                <div className="absolute bottom-[-30%] left-[-10%] w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-[80px] group-hover:scale-125 transition-transform duration-1000" />
 
-                    <div className="relative z-10 glass-morphism border-emerald-500/10 group-hover:border-emerald-500/20 transition-all rounded-[3rem] p-12 md:p-16">
-                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
-                            <div className="flex-1 space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400 border border-emerald-500/20 group-hover:scale-110 transition-transform">
-                                        <Store className="w-7 h-7" />
-                                    </div>
-                                    <span className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">Seller Program</span>
+                <div className="relative z-10 glass-morphism border-emerald-500/10 group-hover:border-emerald-500/20 transition-all rounded-[3rem] p-12 md:p-16">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
+                        <div className="flex-1 space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400 border border-emerald-500/20 group-hover:scale-110 transition-transform">
+                                    <Store className="w-7 h-7" />
                                 </div>
-
-                                <h3 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-tight">
-                                    Start Selling Carbon Credits
-                                </h3>
-                                <p className="text-base text-slate-400 font-medium leading-relaxed max-w-xl">
-                                    Join the VerdiTrust marketplace as a verified seller. List your carbon offset projects and connect with institutional buyers worldwide.
-                                </p>
-
-                                <div className="flex flex-wrap gap-4 pt-2">
-                                    {['List Offset Projects', 'Access Global Buyers', 'Institutional Settlement'].map((benefit, i) => (
-                                        <div key={i} className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                                            <span className="text-xs font-bold text-slate-300">{benefit}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                <span className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">Seller Program</span>
                             </div>
 
-                            <Button
-                                onClick={() => navigate('/seller-onboarding')}
-                                className="h-16 px-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm uppercase tracking-widest shadow-2xl shadow-emerald-900/30 transition-all hover:scale-105 active:scale-[0.98] flex items-center gap-3 shrink-0"
-                            >
-                                Become a Seller
-                                <ArrowRight className="w-5 h-5" />
-                            </Button>
+                            <h3 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-tight">
+                                Start Selling Carbon Credits
+                            </h3>
+                            <p className="text-base text-slate-400 font-medium leading-relaxed max-w-xl">
+                                Join the VerdiTrust marketplace as a verified seller. List your carbon offset projects and connect with institutional buyers worldwide.
+                            </p>
+
+                            <div className="flex flex-wrap gap-4 pt-2">
+                                {['List Offset Projects', 'Access Global Buyers', 'Institutional Settlement'].map((benefit, i) => (
+                                    <div key={i} className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span className="text-xs font-bold text-slate-300">{benefit}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
+
+                        <Button
+                            onClick={() => navigate('/seller-onboarding')}
+                            className="h-16 px-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm uppercase tracking-widest shadow-2xl shadow-emerald-900/30 transition-all hover:scale-105 active:scale-[0.98] flex items-center gap-3 shrink-0"
+                        >
+                            Become a Seller
+                            <ArrowRight className="w-5 h-5" />
+                        </Button>
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 };

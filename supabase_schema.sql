@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
     platform_fee DECIMAL(10, 2) DEFAULT 2.5,
     verification_timeout INT DEFAULT 48,
     is_hosted BOOLEAN DEFAULT TRUE,
+    vercel_deploy_hook TEXT,
     two_factor_required BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

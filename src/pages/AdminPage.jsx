@@ -31,36 +31,84 @@ const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Data State
     const [users, setUsers] = useState([]);
     const [projects, setProjects] = useState([]);
+    const [stats, setStats] = useState([
+        { label: 'Total Revenue', value: '₹0', change: '+0%', icon: TrendingUp, trend: 'up', color: 'text-emerald-400' },
+        { label: 'Active Projects', value: '0', change: '+0', icon: Activity, trend: 'up', color: 'text-blue-400' },
+        { label: 'New Users', value: '0', change: '+0%', icon: Users, trend: 'up', color: 'text-amber-400' },
+        { label: 'System Uptime', value: '99.9%', change: 'Stable', icon: ShieldCheck, trend: 'neutral', color: 'text-teal-400' },
+    ]);
+
+    const fetchData = async () => {
+        try {
+            // Fetch Users
+            const { data: usersData, error: usersErr } = await supabase.from('users').select('*').order('joined_at', { ascending: false });
+            if (usersErr) throw usersErr;
+            const mappedUsers = (usersData || []).map(u => ({
+                ...u,
+                id: '#' + u.id,
+                date: new Date(u.joined_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
+            }));
+            setUsers(mappedUsers);
+
+            // Fetch Listings (unified source for Verification Pipeline)
+            const { data: listingsData, error: listErr } = await supabase.from('listings').select('*').order('created_at', { ascending: false });
+            if (listErr) throw listErr;
+            const mappedListings = (listingsData || []).map(l => ({
+                ...l,
+                name: l.project_source,
+                dev: 'Verified Developer',
+                region: l.project_source.split(' ').pop() || 'Global',
+                date: new Date(l.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+                type: 'LISTING',
+                statusColor: l.status === 'Active' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                    l.status === 'Rejected' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                    l.status === 'In Review' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
+                    'text-amber-400 bg-amber-500/10 border-amber-500/20'
+            }));
+
+            // Fetch Projects (initial verification pipeline source)
+            const { data: projectsData, error: projErr } = await supabase.from('projects').select('*').order('submitted_at', { ascending: false });
+            if (projErr) throw projErr;
+            const mappedProjects = (projectsData || []).map(p => ({
+                ...p,
+                dev: p.developer || 'New Developer',
+                region: p.region || 'Unknown',
+                date: new Date(p.submitted_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+                type: 'PROJECT',
+                statusColor: p.status === 'Approved' || p.status === 'Active' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                    p.status === 'Rejected' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                    p.status === 'In Review' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
+                    'text-amber-400 bg-amber-500/10 border-amber-500/20'
+            }));
+
+            // Combine and sort by date
+            const combinedPipeline = [...mappedListings, ...mappedProjects].sort((a, b) => {
+                const dateA = new Date(a.created_at || a.submitted_at);
+                const dateB = new Date(b.created_at || b.submitted_at);
+                return dateB - dateA;
+            });
+            setProjects(combinedPipeline);
+
+            // Fetch Transactions for Revenue
+            const { data: txData, error: txErr } = await supabase.from('transactions').select('amount');
+            if (txErr) throw txErr;
+            const totalRevenue = (txData || []).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+            // Calculate Dynamic Stats
+            setStats([
+                { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString('en-IN')}`, change: 'LIVE', icon: TrendingUp, trend: 'up', color: 'text-emerald-400' },
+                { label: 'Active Assets', value: String(mappedListings.filter(l => l.status === 'Active').length + mappedProjects.filter(p => p.status === 'Approved' || p.status === 'Active').length), change: 'LIVE', icon: Activity, trend: 'up', color: 'text-blue-400' },
+                { label: 'Registered Users', value: String(mappedUsers.length), change: 'LIVE', icon: Users, trend: 'up', color: 'text-amber-400' },
+                { label: 'System Uptime', value: '99.9%', change: 'Stable', icon: ShieldCheck, trend: 'neutral', color: 'text-teal-400' },
+            ]);
+        } catch (err) {
+            console.error("Failed to fetch admin data", err);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const { data: usersData, error: usersErr } = await supabase.from('users').select('*').order('joined_at', { ascending: false });
-                if (usersErr) throw usersErr;
-                setUsers((usersData || []).map(u => ({
-                    ...u,
-                    id: '#' + u.id,
-                    date: new Date(u.joined_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
-                })));
-
-                const { data: projectsData, error: projErr } = await supabase.from('projects').select('*').order('submitted_at', { ascending: false });
-                if (projErr) throw projErr;
-                setProjects((projectsData || []).map(p => ({
-                    ...p,
-                    dev: p.developer,
-                    date: new Date(p.submitted_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
-                    statusColor: p.status === 'Approved' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                        p.status === 'Rejected' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
-                            p.status === 'In Review' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
-                                'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                })));
-            } catch (err) {
-                console.error("Failed to fetch admin data", err);
-            }
-        };
         fetchData();
     }, []);
 
@@ -74,6 +122,9 @@ const AdminPage = () => {
     const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
     const [showSaveToast, setShowSaveToast] = useState(false);
+    const [isAuditLogsOpen, setIsAuditLogsOpen] = useState(false);
+    const [vercelDeployHook, setVercelDeployHook] = useState('');
+    const [originalIsHosted, setOriginalIsHosted] = useState(true);
 
     const handleAddUser = async (e) => {
         e.preventDefault();
@@ -118,6 +169,8 @@ const AdminPage = () => {
                     setPlatformFee(data.platform_fee || 2.5);
                     setVerificationTimeout(data.verification_timeout || 48);
                     setIsHosted(data.is_hosted ?? true);
+                    setOriginalIsHosted(data.is_hosted ?? true);
+                    setVercelDeployHook(data.vercel_deploy_hook || '');
                     setTwoFactorEnabled(data.two_factor_required || true);
                 }
             } catch (err) {
@@ -135,11 +188,21 @@ const AdminPage = () => {
                 platform_fee: platformFee,
                 verification_timeout: verificationTimeout,
                 is_hosted: isHosted,
+                vercel_deploy_hook: vercelDeployHook,
                 two_factor_required: twoFactorEnabled,
                 updated_at: new Date().toISOString()
             });
 
             if (error) throw error;
+
+            // Trigger Vercel Build if hosting turned ON
+            if (isHosted && !originalIsHosted && vercelDeployHook) {
+                console.log("Triggering Vercel build...");
+                fetch(vercelDeployHook, { method: 'POST' })
+                    .then(() => console.log("Vercel build triggered successfully"))
+                    .catch(err => console.error("Failed to trigger Vercel build", err));
+            }
+            setOriginalIsHosted(isHosted);
 
             setShowSaveToast(true);
             setTimeout(() => setShowSaveToast(false), 3000);
@@ -150,30 +213,21 @@ const AdminPage = () => {
         }
     };
 
-    const updateProjectStatus = async (id, status) => {
+    const updateProjectStatus = async (id, status, type) => {
         try {
-            const { error } = await supabase.from('projects').update({ status }).eq('id', id);
+            const table = type === 'PROJECT' ? 'projects' : 'listings';
+            const { error } = await supabase.from(table).update({ status: status === 'Approved' && type === 'PROJECT' ? 'Approved' : status }).eq('id', id);
             if (error) throw error;
 
-            const proj = projects.find(p => p.id === id);
+            const proj = projects.find(p => p.id === id && p.type === type);
             if (proj) {
                 await supabase.from('notifications').insert([{
-                    title: `Project ${status}`,
-                    message: `Strategic asset from ${proj.developer} has been ${status.toLowerCase()}.`,
+                    title: `${type === 'PROJECT' ? 'Project' : 'Asset'} ${status}`,
+                    message: `Strategic ${type.toLowerCase()} from ${proj.name} has been ${status.toLowerCase()}.`,
                     is_read: false
                 }]);
             }
-
-            setProjects(projects.map(p => {
-                if (p.id === id) {
-                    let statusColor = 'text-slate-400 bg-slate-500/10 border-slate-500/20';
-                    if (status === 'Approved' || status === 'Active') statusColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-                    if (status === 'Rejected') statusColor = 'text-rose-400 bg-rose-500/10 border-rose-500/20';
-                    if (status === 'In Review') statusColor = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-                    return { ...p, status: status === 'Active' ? 'Approved' : status, statusColor };
-                }
-                return p;
-            }));
+            fetchData();
         } catch (err) {
             console.error(err);
         }
@@ -186,12 +240,6 @@ const AdminPage = () => {
         { id: 'settings', label: 'System Settings', icon: Settings },
     ];
 
-    const stats = [
-        { label: 'Total Revenue', value: '₹1,28,430', change: '+12.5%', icon: TrendingUp, trend: 'up', color: 'text-emerald-400' },
-        { label: 'Active Projects', value: '42', change: '+3', icon: Activity, trend: 'up', color: 'text-blue-400' },
-        { label: 'New Users', value: '156', change: '+18.2%', icon: Users, trend: 'up', color: 'text-amber-400' },
-        { label: 'System Uptime', value: '99.9%', change: 'Stable', icon: ShieldCheck, trend: 'neutral', color: 'text-teal-400' },
-    ];
 
     const renderOverview = () => (
         <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-500">
@@ -230,14 +278,17 @@ const AdminPage = () => {
                     </CardHeader>
                     <CardContent className="pt-6 overflow-x-auto">
                         <div className="space-y-4 min-w-[500px] sm:min-w-0">
-                            {projects.slice(0, 5).map((item, i) => (
+                            {projects.slice(0, 8).map((item, i) => (
                                 <div key={i} className="flex items-center justify-between group cursor-default p-3 hover:bg-white/5 rounded-2xl transition-colors">
                                     <div className="flex items-center gap-4">
                                         <div className={`p-2 sm:p-2.5 rounded-xl ${item.statusColor} bg-opacity-10`}>
                                             <FolderKanban className="w-4 h-4" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-white group-hover:text-emerald-400 transition-colors text-sm tracking-tight truncate max-w-[150px] sm:max-w-none">{item.name}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-bold text-white group-hover:text-emerald-400 transition-colors text-sm tracking-tight truncate max-w-[150px] sm:max-w-none">{item.name}</p>
+                                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-white/5 text-slate-500 uppercase tracking-widest">{item.type}</span>
+                                            </div>
                                             <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.region} • {item.dev}</p>
                                         </div>
                                     </div>
@@ -246,10 +297,8 @@ const AdminPage = () => {
                                             {item.status}
                                         </span>
                                         <div className="flex gap-2">
-                                            {item.status === 'Pending' && (
-                                                <>
-                                                    <Button onClick={() => updateProjectStatus(item.id, 'Approved')} size="sm" className="h-7 text-[8px] sm:text-[9px] bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-[#080c0a] border border-emerald-500/20 font-black uppercase tracking-widest px-2 sm:px-3">Approve</Button>
-                                                </>
+                                            {(item.status === 'Pending' || item.status === 'In Review') && (
+                                                <Button onClick={() => updateProjectStatus(item.id, 'Active', item.type)} size="sm" className="h-7 text-[8px] sm:text-[9px] bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-[#080c0a] border border-emerald-500/20 font-black uppercase tracking-widest px-2 sm:px-3">Authorize</Button>
                                             )}
                                         </div>
                                     </div>
@@ -310,10 +359,22 @@ const AdminPage = () => {
                                 <Plus className="w-4 h-4 mr-2" /> Add User
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-3xl overflow-y-auto max-h-[90vh] scrollbar-hide">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl font-black">Add New User</DialogTitle>
+                        <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[2.5rem] p-8 sm:p-10 overflow-y-auto max-h-[90vh] scrollbar-hide shadow-2xl">
+                            <DialogHeader className="pb-2">
+                                <DialogTitle className="text-3xl font-black tracking-tight pt-2">Add New User</DialogTitle>
                             </DialogHeader>
+
+                            {/* Firebase Auth Notice */}
+                            <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex gap-3 items-start">
+                                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Authentication Notice</p>
+                                    <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                                        This will create a profile in Supabase. New users must still use the <b>"Sign Up" flow</b> or <b>"Forgot Password" flow</b> on the login page to establish their secure credentials.
+                                    </p>
+                                </div>
+                            </div>
+
                             <form onSubmit={handleAddUser} className="space-y-6 pt-6">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase tracking-widest text-slate-500">Full Name</Label>
@@ -339,7 +400,7 @@ const AdminPage = () => {
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase tracking-widest text-slate-500">Role</Label>
                                     <select
-                                        className="w-full h-12 px-4 rounded-xl border border-white/10 bg-[#0c1210] text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                        className="w-full h-12 px-4 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all cursor-pointer appearance-none"
                                         value={newUser.role}
                                         onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                                     >
@@ -348,17 +409,18 @@ const AdminPage = () => {
                                         <option value="Admin">Admin</option>
                                     </select>
                                 </div>
-                                <DialogFooter>
-                                    <Button type="button" variant="ghost" onClick={() => setIsAddUserOpen(false)} className="h-12 rounded-xl text-slate-400 hover:text-white">Cancel</Button>
-                                    <Button type="submit" className="h-12 rounded-xl bg-emerald-500 text-[#080c0a] font-black hover:bg-emerald-400">Create User</Button>
+                                <DialogFooter className="flex flex-row items-center justify-end gap-4 pt-6 mt-4 border-t border-white/5">
+                                    <Button type="button" variant="ghost" onClick={() => setIsAddUserOpen(false)} className="h-12 px-6 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 font-bold transition-all">Cancel</Button>
+                                    <Button type="submit" className="h-12 px-8 rounded-xl bg-emerald-500 text-[#080c0a] font-black hover:bg-emerald-400 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]">Create User</Button>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
                     </Dialog>
                 </div>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
-                <div className="min-w-[800px]">
+            <CardContent className="p-0 overflow-hidden">
+                <div className="overflow-x-auto scrollbar-hide w-full">
+                    <div className="min-w-[800px]">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-white/5 text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">
@@ -408,13 +470,14 @@ const AdminPage = () => {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </CardContent>
         </Card>
     );
 
     return (
-        <div className="flex min-h-screen bg-[#080c0a] text-slate-300 font-['Outfit'] relative overflow-x-hidden">
+        <div className="flex min-h-screen bg-[#080c0a] text-slate-300 font-['Outfit'] relative w-full overflow-x-hidden">
             {/* Sidebar Desktop */}
             <aside className="hidden md:flex w-64 glass-morphism border-r border-white/5 flex-col fixed top-16 bottom-0 z-40 overflow-y-auto">
                 <div className="p-6">
@@ -441,22 +504,24 @@ const AdminPage = () => {
             </aside>
 
             {/* Mobile Tab Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-morphism-heavy border-t border-white/10 px-4 py-3">
-                <div className="flex justify-between items-center gap-2">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-morphism-heavy border-t border-white/10 px-2 sm:px-4 py-3 safe-area-bottom">
+                <div className="flex justify-around items-center w-full max-w-full">
                     {sidebarItems.map((item) => (
                         <button
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
-                            className={`flex flex-col items-center gap-1 flex-1 py-1 rounded-xl transition-all ${activeTab === item.id ? 'text-emerald-400' : 'text-slate-500'}`}
+                            className={`flex flex-col items-center justify-center gap-1.5 flex-1 py-2 px-1 rounded-xl transition-all min-h-[52px] touch-manipulation ${activeTab === item.id
+                                ? 'text-emerald-400 bg-emerald-500/10'
+                                : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'scale-110' : ''}`} />
-                            <span className="text-[8px] font-black uppercase tracking-widest">{item.label.split(' ')[0]}</span>
+                            <item.icon className={`w-5 h-5 transition-transform ${activeTab === item.id ? 'scale-110' : ''}`} />
+                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">{item.label.split(' ')[0]}</span>
                         </button>
                     ))}
                 </div>
             </div>
 
-            <main className="flex-1 md:ml-64 p-4 sm:p-8 pb-24 md:pb-8">
+            <main className="flex-1 md:ml-64 p-4 sm:p-8 pb-24 md:pb-8 w-full max-w-full overflow-x-hidden">
                 <header className="mb-8 sm:mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 sm:gap-0">
                         <div>
@@ -493,8 +558,9 @@ const AdminPage = () => {
                                 />
                             </div>
                         </CardHeader>
-                        <CardContent className="p-0 overflow-x-auto">
-                            <div className="min-w-[800px]">
+                        <CardContent className="p-0 overflow-hidden">
+                            <div className="overflow-x-auto scrollbar-hide w-full">
+                                <div className="min-w-[800px]">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-white/5 text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">
@@ -537,6 +603,7 @@ const AdminPage = () => {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -579,6 +646,16 @@ const AdminPage = () => {
                                     >
                                         <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${isHosted ? 'left-6' : 'left-1'}`} />
                                     </button>
+                                </div>
+                                <div className="space-y-3">
+                                    <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">Vercel Deploy Hook (URL)</Label>
+                                    <Input
+                                        className="h-12 bg-white/5 border-white/10 text-white rounded-xl text-sm font-medium"
+                                        placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                                        value={vercelDeployHook}
+                                        onChange={(e) => setVercelDeployHook(e.target.value)}
+                                    />
+                                    <p className="text-[10px] text-slate-500">Trigger a new production build on Vercel when turning ON platform hosting.</p>
                                 </div>
                                 <Button
                                     onClick={saveSettings}

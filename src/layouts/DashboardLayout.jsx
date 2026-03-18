@@ -169,7 +169,13 @@ const DashboardLayout = () => {
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-6">
-
+                    {localStorage.getItem('isSeller') !== 'true' && !location.pathname.includes('/admin') && (
+                        <Link to="/seller-onboarding" className="hidden md:block">
+                            <Button className="h-10 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[10px] tracking-widest uppercase border border-emerald-500/20 transition-all shadow-lg hover:shadow-emerald-500/20 mr-2">
+                                Become a Seller
+                            </Button>
+                        </Link>
+                    )}
 
                     <div className="flex items-center gap-5">
                         <div className="relative" ref={notificationRef}>
@@ -184,7 +190,7 @@ const DashboardLayout = () => {
                             </button>
 
                             {isNotificationsOpen && (
-                                <div className="absolute right-[-60px] sm:right-0 mt-4 w-[280px] sm:w-80 glass-morphism-heavy rounded-[1.5rem] border border-white/10 shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-right">
+                                <div className="absolute right-0 mt-4 w-[min(90vw,320px)] glass-morphism-heavy rounded-[1.5rem] border border-white/10 shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-right" style={{transform: 'translateX(min(0px, calc(100vw - 340px - 100%)))'}}>
                                     <div className="p-4 sm:p-5 border-b border-white/5 flex justify-between items-center">
                                         <h3 className="font-black text-white text-sm">Notifications</h3>
                                         <button onClick={markAllAsRead} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider">

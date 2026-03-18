@@ -23,30 +23,30 @@ import {
 } from 'lucide-react';
 
 const Hero = () => (
-    <section className="relative pt-64 pb-32 px-6 overflow-hidden">
+    <section className="relative pt-32 pb-16 md:pt-64 md:pb-32 px-6 overflow-hidden min-h-screen flex flex-col justify-center">
         <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[120px] -z-10 animate-pulse-slow" />
         <div className="absolute bottom-[10%] left-[-5%] w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-[100px] -z-10 animate-float" />
 
-        <div className="max-w-7xl mx-auto text-center relative z-10">
-            <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full glass-morphism border-white/10 mb-12 opacity-0 animate-reveal-up">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                <span className="text-xs font-bold uppercase tracking-[0.15em] text-emerald-400">CCTS INDIA COMPLIANT</span>
+        <div className="max-w-7xl mx-auto text-center relative z-10 w-full">
+            <div className="inline-flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-2 rounded-full glass-morphism border-white/10 mb-8 sm:mb-12 opacity-0 animate-reveal-up">
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] text-emerald-400">CCTS INDIA COMPLIANT</span>
             </div>
 
-            <h1 className="text-5xl md:text-7xl font-black leading-[1.05] tracking-tighter mb-10 opacity-0 animate-reveal-up delay-200 text-transparent bg-clip-text bg-gradient-to-b from-white via-white/80 to-white/40 drop-shadow-2xl">
-                Scaling Trust <br />
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black leading-[1.05] tracking-tighter mb-6 sm:mb-10 opacity-0 animate-reveal-up delay-200 text-transparent bg-clip-text bg-gradient-to-b from-white via-white/80 to-white/40 drop-shadow-2xl">
+                Scaling Trust <br className="hidden sm:block" />
                 <span className="italic opacity-80">in the Future.</span>
             </h1>
 
-            <p className="text-lg md:text-xl text-white/70 max-w-4xl mx-auto leading-relaxed font-medium mb-16 opacity-0 animate-reveal-up delay-400">
+            <p className="text-base sm:text-lg md:text-xl text-white/70 max-w-4xl mx-auto leading-relaxed font-medium mb-10 sm:mb-16 opacity-0 animate-reveal-up delay-400 px-4">
                 VerdiTrust is a unified digital platform streamlining the carbon credit lifecycle.
                 From project registration to final retirement, we bridge the gap between
                 environmental impact and national compliance.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 opacity-0 animate-reveal-up delay-600">
-                <Link to="/login">
-                    <Button className="h-16 px-12 rounded-2xl bg-white/90 text-[#080c0a] font-bold text-sm uppercase tracking-[0.15em] hover:bg-emerald-400 transition-all shadow-2xl shadow-emerald-400/10 active:scale-[0.95] group backdrop-blur-md">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8 opacity-0 animate-reveal-up delay-600">
+                <Link to="/login" className="w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-12 rounded-2xl bg-white/90 text-[#080c0a] font-bold text-xs sm:text-sm uppercase tracking-[0.15em] hover:bg-emerald-400 transition-all shadow-2xl shadow-emerald-400/10 active:scale-[0.95] group backdrop-blur-md">
                         Initialize Terminal <ArrowRight className="w-5 h-5 ml-4 group-hover:translate-x-2 transition-transform" />
                     </Button>
                 </Link>
@@ -56,7 +56,7 @@ const Hero = () => (
 );
 
 const Challenges = () => (
-    <section id="challenges" className="py-40 px-6 relative">
+    <section id="challenges" className="py-20 md:py-40 px-6 relative">
         <div className="max-w-7xl mx-auto">
             <div className="grid md:grid-cols-2 gap-24 items-center">
                 <div className="opacity-0 animate-reveal-up">

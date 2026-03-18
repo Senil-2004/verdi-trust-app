@@ -49,14 +49,15 @@ const Navbar = () => {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <Link to="/login">
-                        <Button className="h-12 px-8 rounded-2xl bg-white/10 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-[0.15em] border border-white/10 hover:border-emerald-500/50 transition-all duration-500 shadow-xl hover:shadow-emerald-500/20 active:scale-[0.98]">
+                <div className="flex items-center gap-2 md:gap-4">
+                    {/* Desktop CTA */}
+                    <Link to="/login" className="hidden sm:block">
+                        <Button className="h-10 md:h-12 px-5 md:px-8 rounded-2xl bg-white/10 hover:bg-emerald-600 text-white font-bold text-[10px] md:text-xs uppercase tracking-[0.15em] border border-white/10 hover:border-emerald-500/50 transition-all duration-500 shadow-xl hover:shadow-emerald-500/20 active:scale-[0.98]">
                             Establish Access
                         </Button>
                     </Link>
 
-                    {/* Mobile Menu Button */}
+                    {/* Mobile Menu Button - only visible on small screens */}
                     <button
                         className="md:hidden p-2 text-white/60 hover:text-white transition-colors"
                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

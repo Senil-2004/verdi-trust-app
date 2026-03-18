@@ -37,7 +37,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { supabase } from '../lib/supabase';
 
-const SUPABASE_STORAGE_URL = 'https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads';
+const SUPABASE_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/uploads`;
 
 const StatCard = ({ title, value, change, icon: Icon, trend, color }) => (
     <Card className="border-none glass-morphism hover:scale-[1.02] transition-all duration-500 cursor-default group overflow-hidden">
@@ -350,7 +350,7 @@ Certificate: ${l.certificate_file || 'N/A'}`;
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-1000">
+        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-1000">
             {/* Action Toast */}
             {actionStatus.active && (
                 <div className="fixed bottom-12 right-12 z-50 animate-in slide-in-from-right-10">
@@ -1282,8 +1282,8 @@ Certificate: ${l.certificate_file || 'N/A'}`;
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="pt-16 pb-12 px-10">
-                        <div className="h-72 flex items-end justify-between gap-6 relative">
+                    <CardContent className="pt-16 pb-12 px-5 sm:px-10">
+                        <div className="h-72 flex items-end justify-between gap-1.5 sm:gap-6 relative">
                             {/* Grid lines */}
                             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
                                 {[...Array(5)].map((_, i) => (

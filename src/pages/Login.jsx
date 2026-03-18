@@ -130,21 +130,26 @@ export function LoginPage() {
                 const user = userCredential.user;
 
                 // Fire-and-forget profile creation
-                Promise.all([
-                    setDoc(doc(db, "users", user.uid), {
-                        name: formData.name, email: formData.email, role: 'buyer', createdAt: new Date().toISOString()
-                    }).catch(() => { }),
-                    supabase.from('users').upsert([{
-                        name: formData.name, email: formData.email, role: 'Credit Buyer', status: 'Active'
-                    }], { onConflict: 'email' }).catch(() => { }),
-                    supabase.from('notifications').insert([{
-                        title: 'New User Registered',
-                        message: `${formData.name} joined.`
-                    }]).catch(() => { })
-                ]);
+                (async () => {
+                    try {
+                        await setDoc(doc(db, "users", user.uid), {
+                            name: formData.name, email: formData.email, role: 'buyer', createdAt: new Date().toISOString()
+                        });
+                        await supabase.from('users').upsert([{
+                            name: formData.name, email: formData.email, role: 'Credit Buyer', status: 'Active'
+                        }], { onConflict: 'email' });
+                        await supabase.from('notifications').insert([{
+                            title: 'New User Registered',
+                            message: `${formData.name} joined.`
+                        }]);
+                    } catch (e) {
+                        console.error('Background sync failed:', e);
+                    }
+                })();
 
                 localStorage.setItem('userName', formData.name);
                 localStorage.setItem('userEmail', formData.email);
+                localStorage.removeItem('isSeller'); // Always clear default for new signups
 
                 // Admin override just in case
                 if ((formData.email || '').toLowerCase().trim() === 'admin@gmail.com') {
@@ -185,8 +190,10 @@ export function LoginPage() {
                 }
 
                 // Redirect based on role
-                const isSeller = profile?.role === 'Project Developer' || profile?.role === 'seller' || localStorage.getItem('isSeller') === 'true';
-                if (isSeller) {
+                const role = profile?.role;
+                if (role === 'Project Developer') {
+                    navigate('/project-developer', { replace: true });
+                } else if (role === 'seller' || localStorage.getItem('isSeller') === 'true') {
                     localStorage.setItem('isSeller', 'true');
                     navigate('/seller', { replace: true });
                 } else {
@@ -207,8 +214,8 @@ export function LoginPage() {
                 'auth/network-request-failed': 'Network error. Check your connection and try again.',
                 'auth/user-disabled': 'This account has been disabled. Contact support.',
             };
-            const code = error.code || '';
-            const friendlyMessage = errorMessages[code] || 'Authentication failed. Please try again.';
+            const code = error?.code || '';
+            const friendlyMessage = errorMessages[code] || error?.message?.replace('Firebase: ', '') || 'Authentication failed. Please check your credentials and try again.';
             setErrors(prev => ({ ...prev, auth: friendlyMessage }));
         } finally {
             setLoading(false);

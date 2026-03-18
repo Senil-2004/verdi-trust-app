@@ -24,7 +24,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { supabase } from '../lib/supabase';
 
-const SUPABASE_STORAGE_URL = 'https://xrtxrajdbfrjvajedyqo.supabase.co/storage/v1/object/public/uploads';
+const SUPABASE_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/uploads`;
 
 const StatCard = ({ title, value, change, icon: Icon, trend }) => (
     <Card className="border-none glass-morphism hover:scale-[1.02] transition-all duration-500 cursor-default group overflow-hidden">

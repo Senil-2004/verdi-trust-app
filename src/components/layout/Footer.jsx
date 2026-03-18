@@ -5,13 +5,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 const LegalDialog = ({ title, icon: Icon, children, open, onOpenChange }) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[3rem] p-12 max-w-2xl w-full">
-            <DialogHeader className="mb-10">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-500/30">
-                        <Icon className="w-6 h-6 text-emerald-400" />
+        <DialogContent className="glass-morphism-heavy border-white/10 text-white rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-12 max-w-2xl w-[95vw] sm:w-full overflow-hidden">
+            <DialogHeader className="mb-6 sm:mb-10">
+                <div className="flex items-center gap-3 sm:gap-4 mb-4">
+                    <div className="p-2 sm:p-3 bg-emerald-500/20 rounded-2xl border border-emerald-500/30">
+                        <Icon className="w-5 h-5 sm:w-6 h-6 text-emerald-400" />
                     </div>
-                    <DialogTitle className="text-4xl font-black tracking-tight text-white">{title}</DialogTitle>
+                    <DialogTitle className="text-2xl sm:text-4xl font-black tracking-tight text-white">{title}</DialogTitle>
                 </div>
                 <div className="h-px w-full bg-gradient-to-r from-emerald-500/50 to-transparent" />
             </DialogHeader>
@@ -30,7 +30,7 @@ const Footer = () => {
 
     return (
         <footer className="py-20 border-t border-white/5 bg-[#080c0a]">
-            <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-10">
+            <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8 md:gap-10 text-center md:text-left">
                 <Link
                     to="/"
                     className="flex items-center gap-3 opacity-50 hover:opacity-100 transition-opacity"
@@ -39,10 +39,10 @@ const Footer = () => {
                     <Leaf className="w-5 h-5 text-emerald-400" />
                     <span className="text-lg font-black text-white tracking-tighter">VerdiTrust</span>
                 </Link>
-                <p className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] text-slate-400 max-w-[280px] sm:max-w-none">
                     © 2026 VERDITRUST ECOLOGICAL LEDGER. ALL RIGHTS RESERVED.
                 </p>
-                <div className="flex gap-8 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+                <div className="flex flex-wrap justify-center gap-4 sm:gap-8 text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
                     <button onClick={() => setOpenDialog('privacy')} className="hover:text-white transition-colors uppercase">Privacy</button>
                     <button onClick={() => setOpenDialog('terms')} className="hover:text-white transition-colors uppercase">Terms</button>
                     <button onClick={() => setOpenDialog('security')} className="hover:text-white transition-colors uppercase">Security</button>
